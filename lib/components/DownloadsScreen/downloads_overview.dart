@@ -16,10 +16,8 @@ class DownloadsOverview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isarDownloads = GetIt.instance<IsarDownloads>();
-
-    return StreamBuilder<Map<DownloadItemState, int>>(
+    return StreamBuilder(
       stream: isarDownloads.downloadStatusesStream,
-      initialData: isarDownloads.downloadStatuses,
       builder: (context, snapshot) {
         if (snapshot.hasData) {
           // We have to awkwardly get two strings like this because Flutter's
@@ -31,11 +29,6 @@ class DownloadsOverview extends StatelessWidget {
           final downloadedImagesString = AppLocalizations.of(context)!
               .downloadedImagesCount(
                   isarDownloads.getDownloadCount(type: DownloadItemType.image));
-          final downloadCount =
-              (snapshot.data?[DownloadItemState.complete] ?? 0) +
-                  (snapshot.data?[DownloadItemState.failed] ?? 0) +
-                  (snapshot.data?[DownloadItemState.enqueued] ?? 0) +
-                  (snapshot.data?[DownloadItemState.downloading] ?? 0);
 
           return Card(
             child: Padding(
@@ -50,7 +43,8 @@ class DownloadsOverview extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           AutoSizeText(
-                            AppLocalizations.of(context)!.downloadCount(downloadCount),
+                            AppLocalizations.of(context)!
+                                .downloadCount(snapshot.data?.total ?? -1),
                             style: const TextStyle(fontSize: 28),
                             maxLines: 1,
                           ),
@@ -69,26 +63,23 @@ class DownloadsOverview extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           Text(
-                            AppLocalizations.of(context)!.dlComplete(
-                                snapshot.data?[DownloadItemState.complete] ??
-                                    -1),
+                            AppLocalizations.of(context)!
+                                .dlComplete(snapshot.data?.complete ?? -1),
                             style: const TextStyle(color: Colors.green),
                           ),
                           Text(
-                            AppLocalizations.of(context)!.dlFailed(
-                                snapshot.data?[DownloadItemState.failed] ?? -1),
+                            AppLocalizations.of(context)!
+                                .dlFailed(snapshot.data?.failed ?? -1),
                             style: const TextStyle(color: Colors.red),
                           ),
                           Text(
-                            AppLocalizations.of(context)!.dlEnqueued(
-                                snapshot.data?[DownloadItemState.enqueued] ??
-                                    -1),
+                            AppLocalizations.of(context)!
+                                .dlEnqueued(snapshot.data?.enqueued ?? -1),
                             style: const TextStyle(color: Colors.grey),
                           ),
                           Text(
-                            AppLocalizations.of(context)!.dlRunning(
-                                snapshot.data?[DownloadItemState.downloading] ??
-                                    -1),
+                            AppLocalizations.of(context)!
+                                .dlRunning(snapshot.data?.downloading ?? -1),
                             style: const TextStyle(color: Colors.grey),
                           ),
                         ],

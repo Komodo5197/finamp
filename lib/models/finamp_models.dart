@@ -17,6 +17,7 @@ import 'jellyfin_models.dart';
 part 'finamp_models.g.dart';
 
 @HiveType(typeId: 8)
+@collection
 class FinampUser {
   FinampUser({
     required this.id,
@@ -24,7 +25,8 @@ class FinampUser {
     required this.accessToken,
     required this.serverId,
     this.currentViewId,
-    required this.views,
+    this.views = const {},
+    this.isarId = Isar.autoIncrement,
   });
 
   @HiveField(0)
@@ -37,9 +39,17 @@ class FinampUser {
   String serverId;
   @HiveField(4)
   String? currentViewId;
+  @ignore
   @HiveField(5)
   Map<String, BaseItemDto> views;
 
+  Id isarId;
+  String get isarViews => jsonEncode(views);
+  set isarViews(String json) =>
+      views = (jsonDecode(json) as Map<String, dynamic>)
+          .map((k, v) => MapEntry(k, BaseItemDto.fromJson(v)));
+
+  @ignore
   BaseItemDto? get currentView => views[currentViewId];
 }
 
@@ -712,7 +722,7 @@ class DownloadItem extends DownloadStub {
     required this.baseIndexNumber,
     required this.parentIndexNumber,
     required this.orderedChildren,
-  }): super._build();
+  }) : super._build();
 
   final requires = IsarLinks<DownloadItem>();
 
@@ -811,7 +821,6 @@ enum BaseItemDtoType {
 
   final String? idString;
 
-
   static BaseItemDtoType fromItem(BaseItemDto item) {
     switch (item.type) {
       case "Audio":
@@ -828,6 +837,38 @@ enum BaseItemDtoType {
         return unknown;
     }
   }
+}
+
+@collection
+class DownloadStatusSummary {
+  final Id id = 0;
+  int downloading = 0;
+  int failed = 0;
+  int complete = 0;
+  int enqueued = 0;
+  set(DownloadItemState state, int value) => _update(state, (_) => value);
+  update(DownloadItemState oldState, DownloadItemState newState,
+      {int count = 1}) {
+    _update(oldState, (x) => x - count);
+    _update(newState, (x) => x + count);
+  }
+
+  _update(DownloadItemState state, int Function(int) func) {
+    switch (state) {
+      case DownloadItemState.notDownloaded:
+        break;
+      case DownloadItemState.downloading:
+        downloading = func(downloading);
+      case DownloadItemState.failed:
+        failed = func(failed);
+      case DownloadItemState.complete:
+        complete = func(complete);
+      case DownloadItemState.enqueued:
+        enqueued = func(enqueued);
+    }
+  }
+
+  int get total => downloading + failed + complete + enqueued;
 }
 
 @HiveType(typeId: 43)

@@ -9,6 +9,7 @@ import 'package:finamp/color_schemes.g.dart';
 import 'package:finamp/services/finamp_settings_helper.dart';
 import 'package:finamp/services/finamp_user_helper.dart';
 import 'package:finamp/services/isar_downloads.dart';
+import 'package:finamp/services/isar_downloads_background.dart';
 import 'package:finamp/services/offline_listen_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -63,7 +64,6 @@ void main() async {
     _setupFinampUserHelper();
     _setupJellyfinApiData();
     _setupOfflineListenLogHelper();
-    await _setupDownloader();
     await _setupDownloadsHelper();
     await _setupAudioServiceHelper();
   } catch (e) {
@@ -99,28 +99,39 @@ void _setupOfflineListenLogHelper() {
 }
 
 Future<void> _setupDownloadsHelper() async {
-  GetIt.instance.registerSingleton(IsarDownloads());
-  final isarDownloads = GetIt.instance<IsarDownloads>();
+  ReceivePort startupReceiver = ReceivePort();
+  ReceivePort commandReceiver = ReceivePort();
+  await FileDownloader().configure(globalConfig:(Config.checkAvailableSpace, 200));
+  await Isolate.spawn(IsarDownloadsBackground.startup, (startupReceiver.sendPort,RootIsolateToken.instance!,commandReceiver.sendPort));
+  //IsarDownloadsBackground.startup((startupReceiver.sendPort,RootIsolateToken.instance!,commandReceiver.sendPort),inIsolate: false);
+  var (commandSender,eventSender) = await startupReceiver.first;
+  startupReceiver.close();
+  final isarDownloads = IsarDownloads(commandSender,eventSender,commandReceiver);
+  GetIt.instance.registerSingleton(isarDownloads);
 
   if (!FinampSettingsHelper.finampSettings.hasCompletedIsarDownloadsMigration) {
     await isarDownloads.migrateFromHive();
+    await GetIt.instance<Isar>().writeTxn(() async {
+      await GetIt
+          .instance<Isar>()
+          .finampUsers
+          .putAll(Hive
+          .box<FinampUser>("FinampUsers")
+          .values
+          .toList());
+      var currentUser = Hive.box<FinampUser>("FinampUsers")
+          .get(Hive.box<String>("CurrentUserId").get("CurrentUserId"));
+      if (currentUser != null) {
+        currentUser.isarId = 0;
+        await GetIt
+            .instance<Isar>()
+            .finampUsers
+            .put(currentUser);
+      }
+    });
     FinampSettingsHelper.setHasCompletedIsarDownloadsMigration(true);
   }
   await FileDownloader().resumeFromBackground();
-}
-
-Future<void> _setupDownloader() async {
-  //GetIt.instance.registerSingleton(DownloadUpdateStream());
-  //GetIt.instance<DownloadUpdateStream>().setupSendPort();
-
-  WidgetsFlutterBinding.ensureInitialized();
-  //await FlutterDownloader.initialize(debug: true);
-
-  // flutter_downloader sometimes crashes when adding downloads. For some
-  // reason, adding this callback fixes it.
-  // https://github.com/fluttercommunity/flutter_downloader/issues/445
-
-  //FlutterDownloader.registerCallback(_DummyCallback.callback);
 }
 
 Future<void> setupHive() async {
@@ -169,14 +180,9 @@ Future<void> setupHive() async {
   Hive.registerAdapter(LocaleAdapter());
   Hive.registerAdapter(OfflineListenAdapter());
   await Future.wait([
-    Hive.openBox<DownloadedParent>("DownloadedParents"),
-    Hive.openBox<DownloadedSong>("DownloadedItems"),
-    Hive.openBox<DownloadedSong>("DownloadIds"),
     Hive.openBox<FinampUser>("FinampUsers"),
     Hive.openBox<String>("CurrentUserId"),
     Hive.openBox<FinampSettings>("FinampSettings"),
-    Hive.openBox<DownloadedImage>("DownloadedImages"),
-    Hive.openBox<String>("DownloadedImageIds"),
     Hive.openBox<ThemeMode>("ThemeMode"),
     Hive.openBox<Locale?>(LocaleHelper.boxName),
     Hive.openBox<OfflineListen>("OfflineListens")
@@ -194,11 +200,10 @@ Future<void> setupHive() async {
 
   final dir = await getApplicationDocumentsDirectory();
   final isar = await Isar.open(
-    [DownloadItemSchema],
+    [DownloadItemSchema, DownloadStatusSummarySchema, FinampUserSchema],
     directory: dir.path,
   );
   GetIt.instance.registerSingleton(isar);
-
 }
 
 Future<void> _setupAudioServiceHelper() async {
@@ -300,74 +305,74 @@ class Finamp extends StatelessWidget {
           valueListenable: LocaleHelper.localeListener,
           builder: (_, __, ___) {
             return ValueListenableBuilder<Box<ThemeMode>>(
-                valueListenable: ThemeModeHelper.themeModeListener,
-                builder: (_, box, __) {
-                  return MaterialApp(
-                    title: "Finamp",
-                    routes: {
-                      SplashScreen.routeName: (context) => const SplashScreen(),
-                      UserSelector.routeName: (context) => const UserSelector(),
-                      ViewSelector.routeName: (context) => const ViewSelector(),
-                      MusicScreen.routeName: (context) => const MusicScreen(),
-                      AlbumScreen.routeName: (context) => const AlbumScreen(),
-                      ArtistScreen.routeName: (context) => const ArtistScreen(),
-                      AddToPlaylistScreen.routeName: (context) =>
-                          const AddToPlaylistScreen(),
-                      PlayerScreen.routeName: (context) => const PlayerScreen(),
-                      DownloadsScreen.routeName: (context) =>
-                          const DownloadsScreen(),
-                      //DownloadsErrorScreen.routeName: (context) =>
-                      //    const DownloadsErrorScreen(),
-                      LogsScreen.routeName: (context) => const LogsScreen(),
-                      SettingsScreen.routeName: (context) =>
-                          const SettingsScreen(),
-                      TranscodingSettingsScreen.routeName: (context) =>
-                          const TranscodingSettingsScreen(),
-                      DownloadsSettingsScreen.routeName: (context) =>
-                          const DownloadsSettingsScreen(),
-                      AddDownloadLocationScreen.routeName: (context) =>
-                          const AddDownloadLocationScreen(),
-                      AudioServiceSettingsScreen.routeName: (context) =>
-                          const AudioServiceSettingsScreen(),
-                      TabsSettingsScreen.routeName: (context) =>
-                          const TabsSettingsScreen(),
-                      LayoutSettingsScreen.routeName: (context) =>
-                          const LayoutSettingsScreen(),
-                      LanguageSelectionScreen.routeName: (context) =>
-                          const LanguageSelectionScreen(),
-                    },
-                    initialRoute: SplashScreen.routeName,
-                    theme: ThemeData(
-                      brightness: Brightness.light,
-                      colorScheme: lightColorScheme,
-                      appBarTheme: const AppBarTheme(
-                        systemOverlayStyle: SystemUiOverlayStyle(
-                          statusBarBrightness: Brightness.light,
-                          statusBarIconBrightness: Brightness.dark,
-                        ),
+              valueListenable: ThemeModeHelper.themeModeListener,
+              builder: (_, box, __) {
+                return MaterialApp(
+                  title: "Finamp",
+                  routes: {
+                    SplashScreen.routeName: (context) => const SplashScreen(),
+                    UserSelector.routeName: (context) => const UserSelector(),
+                    ViewSelector.routeName: (context) => const ViewSelector(),
+                    MusicScreen.routeName: (context) => const MusicScreen(),
+                    AlbumScreen.routeName: (context) => const AlbumScreen(),
+                    ArtistScreen.routeName: (context) => const ArtistScreen(),
+                    AddToPlaylistScreen.routeName: (context) =>
+                        const AddToPlaylistScreen(),
+                    PlayerScreen.routeName: (context) => const PlayerScreen(),
+                    DownloadsScreen.routeName: (context) =>
+                        const DownloadsScreen(),
+                    //DownloadsErrorScreen.routeName: (context) =>
+                    //    const DownloadsErrorScreen(),
+                    LogsScreen.routeName: (context) => const LogsScreen(),
+                    SettingsScreen.routeName: (context) =>
+                        const SettingsScreen(),
+                    TranscodingSettingsScreen.routeName: (context) =>
+                        const TranscodingSettingsScreen(),
+                    DownloadsSettingsScreen.routeName: (context) =>
+                        const DownloadsSettingsScreen(),
+                    AddDownloadLocationScreen.routeName: (context) =>
+                        const AddDownloadLocationScreen(),
+                    AudioServiceSettingsScreen.routeName: (context) =>
+                        const AudioServiceSettingsScreen(),
+                    TabsSettingsScreen.routeName: (context) =>
+                        const TabsSettingsScreen(),
+                    LayoutSettingsScreen.routeName: (context) =>
+                        const LayoutSettingsScreen(),
+                    LanguageSelectionScreen.routeName: (context) =>
+                        const LanguageSelectionScreen(),
+                  },
+                  initialRoute: SplashScreen.routeName,
+                  theme: ThemeData(
+                    brightness: Brightness.light,
+                    colorScheme: lightColorScheme,
+                    appBarTheme: const AppBarTheme(
+                      systemOverlayStyle: SystemUiOverlayStyle(
+                        statusBarBrightness: Brightness.light,
+                        statusBarIconBrightness: Brightness.dark,
                       ),
                     ),
-                    darkTheme: ThemeData(
-                      brightness: Brightness.dark,
-                      colorScheme: darkColorScheme,
-                    ),
-                    themeMode: box.get("ThemeMode"),
-                    localizationsDelegates: const [
-                      AppLocalizations.delegate,
-                      GlobalMaterialLocalizations.delegate,
-                      GlobalWidgetsLocalizations.delegate,
-                      GlobalCupertinoLocalizations.delegate,
-                    ],
-                    supportedLocales: AppLocalizations.supportedLocales,
-                    // We awkwardly put English as the first supported locale so
-                    // that basicLocaleListResolution falls back to it instead of
-                    // the first language in supportedLocales (Arabic as of writing)
-                    localeListResolutionCallback: (locales, supportedLocales) =>
-                        basicLocaleListResolution(locales,
-                            [const Locale("en")].followedBy(supportedLocales)),
-                    locale: LocaleHelper.locale,
-                  );
-                },
+                  ),
+                  darkTheme: ThemeData(
+                    brightness: Brightness.dark,
+                    colorScheme: darkColorScheme,
+                  ),
+                  themeMode: box.get("ThemeMode"),
+                  localizationsDelegates: const [
+                    AppLocalizations.delegate,
+                    GlobalMaterialLocalizations.delegate,
+                    GlobalWidgetsLocalizations.delegate,
+                    GlobalCupertinoLocalizations.delegate,
+                  ],
+                  supportedLocales: AppLocalizations.supportedLocales,
+                  // We awkwardly put English as the first supported locale so
+                  // that basicLocaleListResolution falls back to it instead of
+                  // the first language in supportedLocales (Arabic as of writing)
+                  localeListResolutionCallback: (locales, supportedLocales) =>
+                      basicLocaleListResolution(locales,
+                          [const Locale("en")].followedBy(supportedLocales)),
+                  locale: LocaleHelper.locale,
+                );
+              },
             );
           },
         ),

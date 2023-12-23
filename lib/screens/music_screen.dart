@@ -158,9 +158,9 @@ class _MusicScreenState extends State<MusicScreen>
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<Box<FinampUser>>(
-      valueListenable: _finampUserHelper.finampUsersListenable,
-      builder: (context, value, _) {
+    return StreamBuilder(
+      stream: _finampUserHelper.finampUsersListenable,
+      builder: (context, _) {
         return ValueListenableBuilder<Box<FinampSettings>>(
           valueListenable: FinampSettingsHelper.finampSettingsListener,
           builder: (context, value, _) {

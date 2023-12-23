@@ -48,7 +48,7 @@ class JellyfinApiHelper {
       // use.
       return [];
     }
-    assert(!FinampSettingsHelper.finampSettings.isOffline);
+    //assert(!FinampSettingsHelper.finampSettings.isOffline);
 
     Response response;
 
