@@ -226,6 +226,7 @@ class IsarTaskQueue implements TaskQueue {
   /// Should only be called after background_downloader and IsarDownloads are
   /// fully set up.
   Future<void> initializeQueue() async {
+    return;
     _activeDownloads.addAll(
         (await FileDownloader().allTasks(includeTasksWaitingToRetry: true))
             .map((e) => int.parse(e.taskId)));
@@ -279,82 +280,66 @@ class IsarTaskQueue implements TaskQueue {
   /// finampSettings.maxConcurrentDownloads at once.
   Future<void> _advanceQueue() async {
     try {
-      int count = 0;
-      while (true) {
-        var nextTasks = _isar.downloadItems
-            .where()
-            .stateEqualTo(DownloadItemState.enqueued)
-            .filter()
-            .allOf(_activeDownloads,
-                (q, element) => q.not().isarIdEqualTo(element))
-            .limit(20)
-            .findAllSync();
-        if (nextTasks.isEmpty ||
-            !_isarDownloads.allowDownloads ||
-            FinampSettingsHelper.finampSettings.isOffline) {
-          return;
+      var nextTasks = _isar.downloadItems
+          .where()
+          .stateEqualTo(DownloadItemState.enqueued)
+          .findAllSync();
+      if (nextTasks.isEmpty ||
+          !_isarDownloads.allowDownloads ||
+          FinampSettingsHelper.finampSettings.isOffline) {
+        return;
+      }
+      const workDuration = Duration(milliseconds: 50);
+      const yieldDuration = Duration(milliseconds: 10);
+      var mustYieldAtTime = DateTime.now().add(workDuration);
+      final tokenHeader = _jellyfinApiData.getTokenHeader();
+      _enqueueLog.severe("Starting to add enqueued tasks to MemoryTaskQueue");
+      for (var task in nextTasks) {
+        if (task.file == null) {
+          _enqueueLog.severe("Recieved ${task.name} with no valid file path.");
+          _isar.writeTxnSync(() {
+            _isarDownloads.updateItemState(task, DownloadItemState.failed);
+          });
+          continue;
         }
-        final tokenHeader = _jellyfinApiData.getTokenHeader();
-        for (var task in nextTasks) {
-          if (task.file == null) {
-            _enqueueLog
-                .severe("Recieved ${task.name} with no valid file path.");
-            _isar.writeTxnSync(() {
-              _isarDownloads.updateItemState(task, DownloadItemState.failed);
-            });
-            continue;
-          }
-          while (_activeDownloads.length >=
-              FinampSettingsHelper.finampSettings.maxConcurrentDownloads) {
-            await Future.delayed(const Duration(milliseconds: 500));
-          }
-          _activeDownloads.add(task.isarId);
-          // Base URL shouldn't be null at this point (user has to be logged in
-          // to get to the point where they can add downloads).
-          var url = switch (task.type) {
-            DownloadItemType.song =>
-              "${_finampUserHelper.currentUser!.baseUrl}/Items/${task.id}/File",
-            DownloadItemType.image => _jellyfinApiData
-                .getImageUrl(
-                  item: task.baseItem!,
-                  // Download original file
-                  quality: null,
-                  format: null,
-                )
-                .toString(),
-            _ => throw StateError("???"),
-          };
-          var start = DateTime.now();
-          bool success = await FileDownloader().enqueue(DownloadTask(
-              taskId: task.isarId.toString(),
-              url: url,
-              //requiresWiFi:
-              //    FinampSettingsHelper.finampSettings.requireWifiForDownloads,
-              displayName: task.name,
-              baseDirectory: task.downloadLocation!.baseDirectory.baseDirectory,
-              retries: 3,
-              directory: path_helper.dirname(task.path!),
-              headers: {
-                if (tokenHeader != null) "X-Emby-Token": tokenHeader,
-              },
-              filename: path_helper.basename(task.path!)));
-          if (!success) {
-            // We currently have no way to recover here.  The user must re-sync to clear
-            // the stuck download.
-            _enqueueLog.severe(
-                "Task ${task.name} failed to enqueue with background_downloader.");
-          }
-          _enqueueLog.finest(
-              "Enqueue took ${DateTime.now().difference(start).inMilliseconds} milliseconds");
-          count++;
-          if (count % 3 == 0) {
-            await Future.delayed(const Duration(milliseconds: 40));
-          }
+        _activeDownloads.add(task.isarId);
+        // Base URL shouldn't be null at this point (user has to be logged in
+        // to get to the point where they can add downloads).
+        var url = switch (task.type) {
+          DownloadItemType.song =>
+            "${_finampUserHelper.currentUser!.baseUrl}/Items/${task.id}/File",
+          DownloadItemType.image => _jellyfinApiData
+              .getImageUrl(
+                item: task.baseItem!,
+                // Download original file
+                quality: null,
+                format: null,
+              )
+              .toString(),
+          _ => throw StateError("???"),
+        };
+
+        _isarDownloads.downloadTaskQueue2.add(DownloadTask(
+            taskId: task.isarId.toString(),
+            url: url,
+            //requiresWiFi:
+            //    FinampSettingsHelper.finampSettings.requireWifiForDownloads,
+            displayName: task.name,
+            baseDirectory: task.downloadLocation!.baseDirectory.baseDirectory,
+            retries: 3,
+            directory: path_helper.dirname(task.path!),
+            updates: Updates.none,
+            headers: {
+              if (tokenHeader != null) "X-Emby-Token": tokenHeader,
+            },
+            filename: path_helper.basename(task.path!)));
+        if (DateTime.now().isAfter(mustYieldAtTime)) {
+          await Future.delayed(yieldDuration);
+          mustYieldAtTime = DateTime.now().add(workDuration);
         }
       }
-    } finally {
-      _callbacksComplete?.complete();
-    }
+      _enqueueLog.severe("All enqueued tasks added to MemoryTaskQueue");
+    } finally {}
   }
 
   /// Returns true if the internal queue state and downloader state match

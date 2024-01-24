@@ -43,9 +43,9 @@ class IsarDownloads {
 
     updateDownloadCounts();
 
-    FileDownloader().addTaskQueue(downloadTaskQueue);
+    FileDownloader().addTaskQueue(downloadTaskQueue2);
 
-    FileDownloader().updates.listen((event) {
+    /*FileDownloader().updates.listen((event) {
       if (event is TaskStatusUpdate) {
         _isar.writeTxnSync(() {
           DownloadItem? listener =
@@ -123,7 +123,7 @@ class IsarDownloads {
           }
         });
       }
-    });
+    });*/
 
     // Sometimes we temporarily loose connection while the screen is locked.
     // Try to restart downloads when the user begins interacting again
@@ -167,6 +167,7 @@ class IsarDownloads {
   final _anchor = DownloadStub.fromId(
       id: "Anchor", type: DownloadItemType.anchor, name: null);
   late final downloadTaskQueue = IsarTaskQueue(this);
+  late final downloadTaskQueue2 = MemoryTaskQueue();
   late final deleteBuffer = IsarDeleteBuffer(this);
   late final syncBuffer = IsarSyncBuffer(this);
 
