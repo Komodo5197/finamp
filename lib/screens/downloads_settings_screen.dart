@@ -226,7 +226,7 @@ class ConcurentDownloadsSelector extends StatelessWidget {
                         box.get("FinampSettings")!;
                     finampSettingsTemp.maxConcurrentDownloads = value.toInt();
                     box.put("FinampSettings", finampSettingsTemp);
-                    FileDownloader().configure(androidConfig: (
+                    FileDownloader().configure(globalConfig: (
                       Config.holdingQueue,
                       (value, null, null)
                     ));

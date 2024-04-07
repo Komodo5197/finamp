@@ -132,15 +132,18 @@ Future<void> _setupDownloadsHelper() async {
   }
 
   await FileDownloader().configure(
-      globalConfig: (
-        Config.checkAvailableSpace,
-        1024
-      ),
-      // Android runs all active downloads at once, so limit active to setting
-      androidConfig: (
-        Config.holdingQueue,
-        (FinampSettingsHelper.finampSettings.maxConcurrentDownloads, null, null)
-      ),
+      globalConfig: [
+        (Config.checkAvailableSpace, 1024),
+        // Android/desktop runs all active downloads at once, so limit active to setting
+        (
+          Config.holdingQueue,
+          (
+            FinampSettingsHelper.finampSettings.maxConcurrentDownloads,
+            null,
+            null
+          )
+        )
+      ],
       // iOS has OS limit on downloads, so allow submitting more to OS
       iOSConfig: (
         Config.holdingQueue,
