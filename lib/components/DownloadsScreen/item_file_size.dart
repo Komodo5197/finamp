@@ -58,6 +58,7 @@ class ItemFileSize extends ConsumerWidget {
                     FileSize.getSize(value)));
           }
         case DownloadItemState.downloading:
+        case DownloadItemState.pending:
         case DownloadItemState.enqueued:
         case DownloadItemState.needsRedownload:
           return Future.value(downloadingText);

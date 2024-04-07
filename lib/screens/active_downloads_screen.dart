@@ -16,13 +16,19 @@ class ActiveDownloadsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final downloadsService = GetIt.instance<DownloadsService>();
-    var stream = Rx.combineLatest4<List<DownloadStub>, List<DownloadStub>,
-            List<DownloadStub>, List<DownloadStub>, List<List<DownloadStub>>>(
+    var stream = Rx.combineLatest5<
+            List<DownloadStub>,
+            List<DownloadStub>,
+            List<DownloadStub>,
+            List<DownloadStub>,
+            List<DownloadStub>,
+            List<List<DownloadStub>>>(
         downloadsService.getDownloadList(DownloadItemState.syncFailed),
         downloadsService.getDownloadList(DownloadItemState.failed),
         downloadsService.getDownloadList(DownloadItemState.downloading),
         downloadsService.getDownloadList(DownloadItemState.enqueued),
-        (l1, l2, l3, l4) => [l1, l2, l3, l4]);
+        downloadsService.getDownloadList(DownloadItemState.pending),
+        (l1, l2, l3, l4, l5) => [l1, l2, l3, l4, l5]);
 
     return Scaffold(
       appBar: AppBar(
@@ -68,7 +74,11 @@ class ActiveDownloadsScreen extends StatelessWidget {
                   if (snapshot.data![3].isNotEmpty)
                     DownloadErrorList(
                         state: DownloadItemState.enqueued,
-                        children: snapshot.data![3])
+                        children: snapshot.data![3]),
+                  if (snapshot.data![4].isNotEmpty)
+                    DownloadErrorList(
+                        state: DownloadItemState.pending,
+                        children: snapshot.data![4])
                 ]);
               }
             } else if (snapshot.hasError) {

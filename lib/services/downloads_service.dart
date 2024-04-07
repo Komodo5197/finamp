@@ -222,7 +222,7 @@ class DownloadsService {
                         false)) {
                   // Retry items that failed from a full filesystem once the user
                   // cleans it up and restarts/resyncs
-                  newState = DownloadItemState.enqueued;
+                  newState = DownloadItemState.pending;
                   if (!_fileSystemFull) {
                     _fileSystemFull = true;
                     GlobalSnackbar.message((scaffold) =>
@@ -230,7 +230,7 @@ class DownloadsService {
                   }
                 } else if (event.exception is TaskConnectionException) {
                   // Retry items with connection errors
-                  newState = DownloadItemState.enqueued;
+                  newState = DownloadItemState.pending;
                   incrementConnectionErrors(weight: 2);
                 } else if (event.exception != null) {
                   _downloadsLogger.warning(
@@ -647,7 +647,8 @@ class DownloadsService {
           await _verifyDownload(item);
         case DownloadItemState.notDownloaded:
           break;
-        case DownloadItemState.enqueued: // fall through
+        case DownloadItemState.pending: // fall through
+        case DownloadItemState.enqueued:
         case DownloadItemState.downloading:
         case DownloadItemState.failed:
         case DownloadItemState.syncFailed:
@@ -844,7 +845,8 @@ class DownloadsService {
     } else if (childStates.contains(DownloadItemState.failed) ||
         childStates.contains(DownloadItemState.syncFailed)) {
       return updateItemState(item, DownloadItemState.failed);
-    } else if (childStates.contains(DownloadItemState.enqueued) ||
+    } else if (childStates.contains(DownloadItemState.pending) ||
+        childStates.contains(DownloadItemState.enqueued) ||
         childStates.contains(DownloadItemState.downloading)) {
       // DownloadItemState.enqueued should only be reachable via _initiateDownload
       return updateItemState(item, DownloadItemState.downloading);
@@ -886,7 +888,7 @@ class DownloadsService {
         bestProfile.quality > (item.syncTranscodingProfile!.quality + 2000)) {
       _downloadsLogger.finest("Updating download settings for ${item.name}");
       item.syncTranscodingProfile = bestProfile;
-      if ((item.state == DownloadItemState.enqueued ||
+      if ((item.state == DownloadItemState.pending ||
               item.state == DownloadItemState.downloading ||
               item.state == DownloadItemState.complete) &&
           item.type == DownloadItemType.song &&

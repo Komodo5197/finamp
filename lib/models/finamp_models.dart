@@ -97,6 +97,7 @@ const _suppressPlayerPadding = false;
 const _hideQueueButton = false;
 const _reportQueueToServerDefault = false;
 const _periodicPlaybackSessionUpdateFrequencySecondsDefault = 150;
+const _maxConcurrentDownloads = 10;
 
 @HiveType(typeId: 28)
 class FinampSettings {
@@ -144,7 +145,7 @@ class FinampSettings {
     this.requireWifiForDownloads = false,
     this.onlyShowFullyDownloaded = false,
     this.showDownloadsWithUnknownLibrary = true,
-    this.maxConcurrentDownloads = 10,
+    this.maxConcurrentDownloads = _maxConcurrentDownloads,
     this.downloadWorkers = 5,
     this.resyncOnStartup = _defaultResyncOnStartup,
     this.preferQuickSyncs = true,
@@ -159,7 +160,8 @@ class FinampSettings {
     this.suppressPlayerPadding = _suppressPlayerPadding,
     this.hideQueueButton = _hideQueueButton,
     this.reportQueueToServer = _reportQueueToServerDefault,
-    this.periodicPlaybackSessionUpdateFrequencySeconds = _periodicPlaybackSessionUpdateFrequencySecondsDefault,
+    this.periodicPlaybackSessionUpdateFrequencySeconds =
+        _periodicPlaybackSessionUpdateFrequencySecondsDefault,
   });
 
   @HiveField(0, defaultValue: _isOfflineDefault)
@@ -291,7 +293,7 @@ class FinampSettings {
   @HiveField(37, defaultValue: true)
   bool showDownloadsWithUnknownLibrary;
 
-  @HiveField(38, defaultValue: 10)
+  @HiveField(38, defaultValue: _maxConcurrentDownloads)
   int maxConcurrentDownloads;
 
   @HiveField(39, defaultValue: 5)
@@ -336,7 +338,8 @@ class FinampSettings {
   @HiveField(52, defaultValue: _reportQueueToServerDefault)
   bool reportQueueToServer;
 
-  @HiveField(53, defaultValue: _periodicPlaybackSessionUpdateFrequencySecondsDefault)
+  @HiveField(53,
+      defaultValue: _periodicPlaybackSessionUpdateFrequencySecondsDefault)
   int periodicPlaybackSessionUpdateFrequencySeconds;
 
   @HiveField(54, defaultValue: _showArtistsTopSongs)
@@ -345,7 +348,6 @@ class FinampSettings {
   static Future<FinampSettings> create() async {
     final downloadLocation = await DownloadLocation.create(
       name: "Internal Storage",
-      // TODO update backup exclusions on iOS and make sure support dir is covered
       // default download location moved to support dir based on existing comment
       baseDirectory: DownloadLocationType.internalSupport,
     );
@@ -1071,15 +1073,17 @@ enum DownloadItemState {
   downloading,
   failed,
   complete,
-  enqueued,
+  pending,
   syncFailed,
   needsRedownload,
-  needsRedownloadComplete;
+  needsRedownloadComplete,
+  enqueued;
 
   bool get isFinal {
     switch (this) {
       case DownloadItemState.notDownloaded:
       case DownloadItemState.downloading:
+      case DownloadItemState.pending:
       case DownloadItemState.enqueued:
         return false;
       case DownloadItemState.failed:
@@ -1095,6 +1099,7 @@ enum DownloadItemState {
     switch (this) {
       case DownloadItemState.notDownloaded:
       case DownloadItemState.downloading:
+      case DownloadItemState.pending:
       case DownloadItemState.enqueued:
       case DownloadItemState.syncFailed:
       case DownloadItemState.needsRedownload:
@@ -1109,15 +1114,15 @@ enum DownloadItemState {
   static DownloadItemState fromTaskStatus(TaskStatus status) {
     assert(status != TaskStatus.paused);
     return switch (status) {
-      // DownloadItemState.enqueued should only be reachable via _initiateDownload
+      // DownloadItemState.pending should only be reachable via _initiateDownload
       // or background_downloader listener to ensure item is ready to download
-      TaskStatus.enqueued => DownloadItemState.downloading,
+      TaskStatus.enqueued => DownloadItemState.enqueued,
       TaskStatus.running => DownloadItemState.downloading,
       TaskStatus.complete => DownloadItemState.complete,
       TaskStatus.failed => DownloadItemState.failed,
       TaskStatus.canceled => DownloadItemState.notDownloaded,
       // Put paused items back in queue to be restarted
-      TaskStatus.paused => DownloadItemState.enqueued,
+      TaskStatus.paused => DownloadItemState.pending,
       TaskStatus.notFound => DownloadItemState.failed,
       TaskStatus.waitingToRetry => DownloadItemState.downloading,
     };

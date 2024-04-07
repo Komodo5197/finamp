@@ -26,8 +26,9 @@ class DownloadedIndicator extends ConsumerWidget {
         case null:
         case DownloadItemState.notDownloaded:
           return const SizedBox.shrink();
-        case DownloadItemState.enqueued:
+        case DownloadItemState.pending:
         case DownloadItemState.downloading:
+        case DownloadItemState.enqueued:
         case DownloadItemState.needsRedownload:
           return Icon(
             Icons.download_outlined,

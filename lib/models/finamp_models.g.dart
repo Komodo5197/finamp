@@ -3271,20 +3271,22 @@ const _DownloadItemstateEnumValueMap = {
   'downloading': 1,
   'failed': 2,
   'complete': 3,
-  'enqueued': 4,
+  'pending': 4,
   'syncFailed': 5,
   'needsRedownload': 6,
   'needsRedownloadComplete': 7,
+  'enqueued': 8,
 };
 const _DownloadItemstateValueEnumMap = {
   0: DownloadItemState.notDownloaded,
   1: DownloadItemState.downloading,
   2: DownloadItemState.failed,
   3: DownloadItemState.complete,
-  4: DownloadItemState.enqueued,
+  4: DownloadItemState.pending,
   5: DownloadItemState.syncFailed,
   6: DownloadItemState.needsRedownload,
   7: DownloadItemState.needsRedownloadComplete,
+  8: DownloadItemState.enqueued,
 };
 const _DownloadItemtypeEnumValueMap = {
   'collection': 0,

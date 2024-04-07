@@ -47,6 +47,7 @@ class DownloadsOverview extends StatelessWidget {
                         0) +
                     (snapshot.data?[DownloadItemState.needsRedownload] ?? 0) +
                     (snapshot.data?[DownloadItemState.failed] ?? 0) +
+                    (snapshot.data?[DownloadItemState.pending] ?? 0) +
                     (snapshot.data?[DownloadItemState.enqueued] ?? 0) +
                     (snapshot.data?[DownloadItemState.downloading] ?? 0);
 
@@ -105,6 +106,13 @@ class DownloadsOverview extends StatelessWidget {
                                                   DownloadItemState.failed] ??
                                               -1)),
                                   style: const TextStyle(color: Colors.red),
+                                ),
+                                Text(
+                                  AppLocalizations.of(context)!.dlPending(
+                                      snapshot.data?[
+                                              DownloadItemState.pending] ??
+                                          -1),
+                                  style: const TextStyle(color: Colors.grey),
                                 ),
                                 Text(
                                   AppLocalizations.of(context)!.dlEnqueued(

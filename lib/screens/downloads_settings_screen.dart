@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:math';
 
+import 'package:background_downloader/background_downloader.dart';
 import 'package:finamp/components/AlbumScreen/download_button.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
@@ -225,6 +226,10 @@ class ConcurentDownloadsSelector extends StatelessWidget {
                         box.get("FinampSettings")!;
                     finampSettingsTemp.maxConcurrentDownloads = value.toInt();
                     box.put("FinampSettings", finampSettingsTemp);
+                    FileDownloader().configure(androidConfig: (
+                      Config.holdingQueue,
+                      (value, null, null)
+                    ));
                   },
                 ),
                 Text(

@@ -255,6 +255,8 @@ class IsarTaskQueue implements TaskQueue {
         .stateEqualTo(DownloadItemState.enqueued)
         .or()
         .stateEqualTo(DownloadItemState.downloading)
+        .or()
+        .stateEqualTo(DownloadItemState.pending)
         .filter()
         .typeEqualTo(DownloadItemType.song)
         .or()
@@ -263,14 +265,15 @@ class IsarTaskQueue implements TaskQueue {
       if (item.file?.existsSync() ?? false) {
         _activeDownloads.remove(item.isarId);
         completed.add(item);
-      } else if (item.state == DownloadItemState.downloading) {
+      } else if (item.state == DownloadItemState.downloading ||
+          item.state == DownloadItemState.enqueued) {
         if (!_activeDownloads.contains(item.isarId)) {
           needsEnqueue.add(item);
         }
       }
     }
     _isar.writeTxnSync(() {
-      // Images marked as completed this way will not recieve updated extensions like ones
+      // Images marked as completed this way will not receive updated extensions like ones
       // processed in status updates, but that's not really important
       for (var item in completed) {
         _downloadsService.updateItemState(item, DownloadItemState.complete);
@@ -278,7 +281,7 @@ class IsarTaskQueue implements TaskQueue {
             .info("Marking download ${item.name} as complete on startup.");
       }
       for (var item in needsEnqueue) {
-        _downloadsService.updateItemState(item, DownloadItemState.enqueued);
+        _downloadsService.updateItemState(item, DownloadItemState.pending);
         _enqueueLog.info("Re-enqueueing download ${item.name} on startup.");
       }
     });
@@ -307,7 +310,7 @@ class IsarTaskQueue implements TaskQueue {
       while (true) {
         var nextTasks = _isar.downloadItems
             .where()
-            .stateEqualTo(DownloadItemState.enqueued)
+            .stateEqualTo(DownloadItemState.pending)
             .filter()
             .allOf(_activeDownloads,
                 (q, element) => q.not().isarIdEqualTo(element))
@@ -327,12 +330,7 @@ class IsarTaskQueue implements TaskQueue {
             });
             continue;
           }
-          // Do not limit enqueued downloads on IOS, it throttles them like crazy on its own.
-          while (_activeDownloads.length >=
-                      FinampSettingsHelper
-                          .finampSettings.maxConcurrentDownloads &&
-                  !Platform.isIOS ||
-              _finampUserHelper.currentUser == null) {
+          while (_finampUserHelper.currentUser == null) {
             await Future.delayed(const Duration(milliseconds: 500));
           }
           await SchedulerBinding.instance.scheduleTask(() {
@@ -397,6 +395,7 @@ class IsarTaskQueue implements TaskQueue {
   /// the state of the given item.  Download state should be reset if false.
   Future<bool> validateQueued(DownloadItem item) async {
     if (item.state == DownloadItemState.downloading ||
+        item.state == DownloadItemState.enqueued ||
         _activeDownloads.contains(item.isarId)) {
       var activeTasks =
           await FileDownloader().allTasks(includeTasksWaitingToRetry: true);
@@ -410,7 +409,7 @@ class IsarTaskQueue implements TaskQueue {
 
   /// Remove a download task from this queue and cancel any active download.
   Future<void> remove(DownloadItem item) async {
-    if (item.state == DownloadItemState.enqueued ||
+    if (item.state == DownloadItemState.pending ||
         item.state == DownloadItemState.downloading) {
       _isar.writeTxnSync(() {
         var canonItem = _isar.downloadItems.getSync(item.isarId);
@@ -1371,7 +1370,8 @@ class DownloadsSyncService {
         return;
       case DownloadItemState.notDownloaded:
         break;
-      case DownloadItemState.enqueued: //fall through
+      case DownloadItemState.pending: //fall through
+      case DownloadItemState.enqueued:
       case DownloadItemState.downloading:
         if (await _downloadsService.downloadTaskQueue.validateQueued(item)) {
           return;
@@ -1477,7 +1477,7 @@ class DownloadsSyncService {
         _syncLogger.severe(
             "Song ${canonItem.name} changed state to ${canonItem.state} while initiating download.");
       } else {
-        _downloadsService.updateItemState(canonItem, DownloadItemState.enqueued,
+        _downloadsService.updateItemState(canonItem, DownloadItemState.pending,
             alwaysPut: true);
       }
     });
@@ -1527,7 +1527,7 @@ class DownloadsSyncService {
         _syncLogger.severe(
             "Image ${canonItem.name} changed state to ${canonItem.state} while initiating download.");
       } else {
-        _downloadsService.updateItemState(canonItem, DownloadItemState.enqueued,
+        _downloadsService.updateItemState(canonItem, DownloadItemState.pending,
             alwaysPut: true);
       }
     });
