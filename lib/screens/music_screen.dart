@@ -1,4 +1,3 @@
-import 'package:finamp/services/queue_service.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
@@ -41,7 +40,6 @@ class _MusicScreenState extends ConsumerState<MusicScreen>
   final _audioServiceHelper = GetIt.instance<AudioServiceHelper>();
   final _finampUserHelper = GetIt.instance<FinampUserHelper>();
   final _jellyfinApiHelper = GetIt.instance<JellyfinApiHelper>();
-  final _queueService = GetIt.instance<QueueService>();
 
   void _stopSearching() {
     setState(() {
@@ -179,9 +177,6 @@ class _MusicScreenState extends ConsumerState<MusicScreen>
 
   @override
   Widget build(BuildContext context) {
-    _queueService
-        .performInitialQueueLoad()
-        .catchError((x) => GlobalSnackbar.error(x));
     if (_tabController == null) {
       _buildTabController();
     }

@@ -309,6 +309,8 @@ class QueueService {
     SavedQueueState? finalState = SavedQueueState.pendingSave;
     try {
       _savedQueueState = SavedQueueState.loading;
+      _queueServiceLogger.info(
+          "Loading saved queue created ${DateTime.fromMillisecondsSinceEpoch(info.creation)}.");
       if (info.songCount == 0) {
         await stopPlayback();
         return;
@@ -466,8 +468,8 @@ class QueueService {
         }
       }
 
-      await stopPlayback(); //TODO is this really needed?
-      // await _audioHandler.initializeAudioSource(_queueAudioSource);
+      await _audioHandler.pause();
+      await _queueAudioSource.clear();
 
       List<AudioSource> audioSources = [];
 

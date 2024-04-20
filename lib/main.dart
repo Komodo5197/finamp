@@ -222,7 +222,7 @@ Future<void> setupHive() async {
 
 Future<void> _setupPlaybackServices() async {
   final session = await AudioSession.instance;
-  session.configure(const AudioSessionConfiguration.music());
+  await session.configure(const AudioSessionConfiguration.music());
 
   final audioHandler = await AudioService.init(
     builder: () => MusicPlayerBackgroundTask(),
@@ -241,6 +241,9 @@ Future<void> _setupPlaybackServices() async {
   GetIt.instance.registerSingleton(QueueService());
   GetIt.instance.registerSingleton(PlaybackHistoryService());
   GetIt.instance.registerSingleton(AudioServiceHelper());
+  unawaited(GetIt.instance<QueueService>()
+      .performInitialQueueLoad()
+      .catchError((x) => GlobalSnackbar.error(x)));
 }
 
 /// Migrates the old DownloadLocations list to a map
