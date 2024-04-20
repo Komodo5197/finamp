@@ -376,7 +376,9 @@ class QueueService {
             .seek(Duration(milliseconds: (info.currentTrackSeek ?? 0) - 1000));
       }
 
-      await addToNextUp(items: items["next"]!);
+      if (items["next"]!.isNotEmpty) {
+        await addToNextUp(items: items["next"]!);
+      }
       await seekFuture;
       _queueServiceLogger.info("Loaded saved queue.");
       if (loadedSongs == 0 && info.songCount > 0) {

@@ -197,7 +197,17 @@ Future<void> setupHive() async {
     Hive.openBox<ThemeMode>("ThemeMode"),
     Hive.openBox<FinampStorableQueueInfo>("Queues"),
     Hive.openBox<Locale?>(LocaleHelper.boxName),
-    Hive.openBox<OfflineListen>("OfflineListens")
+    Hive.openBox<OfflineListen>("OfflineListens"),
+    Future.sync(() async {
+      final dir = await getApplicationDocumentsDirectory();
+      final isar = await Isar.open(
+        [DownloadItemSchema, IsarTaskDataSchema, FinampUserSchema],
+        directory: dir.path,
+        name: isarDatabaseName,
+      );
+      GetIt.instance.registerSingleton(isar);
+      return null;
+    })
   ]);
 
   // If the settings box is empty, we add an initial settings value here.
@@ -210,14 +220,6 @@ Future<void> setupHive() async {
   // If no ThemeMode is set, we set it to the default (system)
   Box<ThemeMode> themeModeBox = Hive.box("ThemeMode");
   if (themeModeBox.isEmpty) ThemeModeHelper.setThemeMode(ThemeMode.system);
-
-  final dir = await getApplicationDocumentsDirectory();
-  final isar = await Isar.open(
-    [DownloadItemSchema, IsarTaskDataSchema, FinampUserSchema],
-    directory: dir.path,
-    name: isarDatabaseName,
-  );
-  GetIt.instance.registerSingleton(isar);
 }
 
 Future<void> _setupPlaybackServices() async {
