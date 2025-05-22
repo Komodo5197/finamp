@@ -301,6 +301,7 @@ class FinampSettingsAdapter extends TypeAdapter<FinampSettings> {
           : (fields[111] as List).cast<ArtistItemSections>(),
       autoSwitchItemCurationType:
           fields[112] == null ? true : fields[112] as bool,
+      useOLEDDarkMode: fields[113] == null ? false : fields[113] as bool,
     )
       ..disableGesture = fields[19] == null ? false : fields[19] as bool
       ..showFastScroller = fields[25] == null ? true : fields[25] as bool
@@ -311,7 +312,7 @@ class FinampSettingsAdapter extends TypeAdapter<FinampSettings> {
   @override
   void write(BinaryWriter writer, FinampSettings obj) {
     writer
-      ..writeByte(107)
+      ..writeByte(108)
       ..writeByte(0)
       ..write(obj.isOffline)
       ..writeByte(1)
@@ -525,7 +526,9 @@ class FinampSettingsAdapter extends TypeAdapter<FinampSettings> {
       ..writeByte(111)
       ..write(obj.artistItemSectionsOrder)
       ..writeByte(112)
-      ..write(obj.autoSwitchItemCurationType);
+      ..write(obj.autoSwitchItemCurationType)
+      ..writeByte(113)
+      ..write(obj.useOLEDDarkMode);
   }
 
   @override

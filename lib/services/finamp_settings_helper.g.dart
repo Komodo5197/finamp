@@ -807,6 +807,13 @@ extension FinampSetters on FinampSettingsHelper {
         .put("FinampSettings", finampSettingsTemp);
   }
 
+  static void setUseOLEDDarkMode(bool newUseOLEDDarkMode) {
+    FinampSettings finampSettingsTemp = FinampSettingsHelper.finampSettings;
+    finampSettingsTemp.useOLEDDarkMode = newUseOLEDDarkMode;
+    Hive.box<FinampSettings>("FinampSettings")
+        .put("FinampSettings", finampSettingsTemp);
+  }
+
   static void setBufferDuration(Duration newBufferDuration) {
     FinampSettings finampSettingsTemp = FinampSettingsHelper.finampSettings;
     finampSettingsTemp.bufferDuration = newBufferDuration;
@@ -1083,6 +1090,8 @@ extension FinampSettingsProviderSelectors on StreamProvider<FinampSettings> {
   ProviderListenable<bool> get autoSwitchItemCurationType =>
       finampSettingsProvider
           .select((value) => value.requireValue.autoSwitchItemCurationType);
+  ProviderListenable<bool> get useOLEDDarkMode => finampSettingsProvider
+      .select((value) => value.requireValue.useOLEDDarkMode);
   ProviderListenable<DownloadProfile> get downloadTranscodingProfile =>
       finampSettingsProvider
           .select((value) => value.requireValue.downloadTranscodingProfile);

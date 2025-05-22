@@ -2401,5 +2401,7 @@
   "autoReloadPromptReloadButton": "Reload",
   "@autoReloadPromptReloadButton": {
     "description": "Button title for reloading the queue after network settings change"
-  }
+  },
+  "amoledThemeSettingTitle": "AMOLED dark theme",
+  "amoledThemeSettingSubtitle": "Use an alternative pure black theme when in dark mode"
 }

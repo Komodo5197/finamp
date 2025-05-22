@@ -84,6 +84,7 @@ class _LayoutSettingsScreenState extends ConsumerState<LayoutSettingsScreen> {
           ),
           const Divider(),
           const ThemeSelector(),
+          const UseOLEDDarkModeToggle(),
           const ContentViewTypeDropdownListTile(),
           const FixedSizeGridSwitch(),
           if (!ref.watch(finampSettingsProvider.useFixedSizeGridTiles))
@@ -99,6 +100,20 @@ class _LayoutSettingsScreenState extends ConsumerState<LayoutSettingsScreen> {
           const AutoSwitchItemCurationTypeToggle(),
         ],
       ),
+    );
+  }
+}
+
+class UseOLEDDarkModeToggle extends ConsumerWidget {
+  const UseOLEDDarkModeToggle({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return SwitchListTile.adaptive(
+      title: Text(AppLocalizations.of(context)!.amoledThemeSettingTitle),
+      subtitle: Text(AppLocalizations.of(context)!.amoledThemeSettingSubtitle),
+      value: ref.watch(finampSettingsProvider.useOLEDDarkMode),
+      onChanged: FinampSetters.setUseOLEDDarkMode,
     );
   }
 }
