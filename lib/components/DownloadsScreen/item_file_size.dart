@@ -46,7 +46,7 @@ final downloadSizeTextProvider = FutureProvider.autoDispose.family((Ref ref, Dow
         String codec = "";
         String bitrate = "null";
         if (item.fileTranscodingProfile == null ||
-            item.fileTranscodingProfile?.codec == FinampTranscodingCodec.original) {
+            item.fileTranscodingProfile?.codec == DownloadTranscodingCodec.original) {
           codec = item.baseItem?.mediaSources?[0].container ?? "";
         } else {
           codec = item.fileTranscodingProfile?.codec.name ?? "";
@@ -66,7 +66,7 @@ final downloadSizeTextProvider = FutureProvider.autoDispose.family((Ref ref, Dow
         if (!(item.finampCollection?.type.hasAudio ?? true)) {
           profile = null;
         }
-        final codec = profile?.codec.name ?? FinampTranscodingCodec.original.name;
+        final codec = profile?.codec.name ?? DownloadTranscodingCodec.original.name;
         final fileSize = await downloadsService.getFileSize(item);
         // only show name if there is more than one location
         final locationName = FinampSettingsHelper.finampSettings.downloadLocationsMap.length > 1

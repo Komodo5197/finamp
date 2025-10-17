@@ -192,7 +192,7 @@ class FinampSettingsAdapter extends TypeAdapter<FinampSettings> {
         hasCompletedIsarUserMigration: fields[42] == null
             ? false
             : fields[42] as bool,
-        downloadTranscodingCodec: fields[43] as FinampTranscodingCodec?,
+        downloadTranscodingCodec: fields[43] as DownloadTranscodingCodec?,
         downloadTranscodeBitrate: (fields[45] as num?)?.toInt(),
         shouldTranscodeDownloads: fields[44] == null
             ? TranscodeDownloadsSetting.ask
@@ -280,8 +280,8 @@ class FinampSettingsAdapter extends TypeAdapter<FinampSettings> {
             ? false
             : fields[74] as bool,
         transcodingStreamingFormat: fields[75] == null
-            ? FinampTranscodingStreamingFormat.aacFragmentedMp4
-            : fields[75] as FinampTranscodingStreamingFormat,
+            ? StreamingTranscodingFormat.aacFragmentedMp4
+            : fields[75] as StreamingTranscodingFormat,
         downloadSizeWarningCutoff: fields[80] == null
             ? 150
             : (fields[80] as num).toInt(),
@@ -430,6 +430,12 @@ class FinampSettingsAdapter extends TypeAdapter<FinampSettings> {
         hasCompletedThemeModeLocaleMigration: fields[135] == null
             ? false
             : fields[135] as bool,
+        preferTranscodedDownloadsLocal: fields[136] == null
+            ? PreferTranscodedDownloadsSetting.preferDownloads
+            : fields[136] as PreferTranscodedDownloadsSetting,
+        preferTranscodedDownloadsRemote: fields[137] == null
+            ? PreferTranscodedDownloadsSetting.preferDownloads
+            : fields[137] as PreferTranscodedDownloadsSetting,
       )
       ..disableGesture = fields[19] == null ? false : fields[19] as bool
       ..showFastScroller = fields[25] == null ? true : fields[25] as bool
@@ -444,7 +450,7 @@ class FinampSettingsAdapter extends TypeAdapter<FinampSettings> {
   @override
   void write(BinaryWriter writer, FinampSettings obj) {
     writer
-      ..writeByte(129)
+      ..writeByte(131)
       ..writeByte(0)
       ..write(obj.isOffline)
       ..writeByte(1)
@@ -702,7 +708,11 @@ class FinampSettingsAdapter extends TypeAdapter<FinampSettings> {
       ..writeByte(134)
       ..write(obj.locale)
       ..writeByte(135)
-      ..write(obj.hasCompletedThemeModeLocaleMigration);
+      ..write(obj.hasCompletedThemeModeLocaleMigration)
+      ..writeByte(136)
+      ..write(obj.preferTranscodedDownloadsLocal)
+      ..writeByte(137)
+      ..write(obj.preferTranscodedDownloadsRemote);
   }
 
   @override
@@ -2074,36 +2084,36 @@ class DownloadLocationTypeAdapter extends TypeAdapter<DownloadLocationType> {
 }
 
 class FinampTranscodingCodecAdapter
-    extends TypeAdapter<FinampTranscodingCodec> {
+    extends TypeAdapter<DownloadTranscodingCodec> {
   @override
   final typeId = 65;
 
   @override
-  FinampTranscodingCodec read(BinaryReader reader) {
+  DownloadTranscodingCodec read(BinaryReader reader) {
     switch (reader.readByte()) {
       case 0:
-        return FinampTranscodingCodec.aac;
+        return DownloadTranscodingCodec.aac;
       case 1:
-        return FinampTranscodingCodec.mp3;
+        return DownloadTranscodingCodec.mp3;
       case 2:
-        return FinampTranscodingCodec.opus;
+        return DownloadTranscodingCodec.opus;
       case 3:
-        return FinampTranscodingCodec.original;
+        return DownloadTranscodingCodec.original;
       default:
-        return FinampTranscodingCodec.aac;
+        return DownloadTranscodingCodec.aac;
     }
   }
 
   @override
-  void write(BinaryWriter writer, FinampTranscodingCodec obj) {
+  void write(BinaryWriter writer, DownloadTranscodingCodec obj) {
     switch (obj) {
-      case FinampTranscodingCodec.aac:
+      case DownloadTranscodingCodec.aac:
         writer.writeByte(0);
-      case FinampTranscodingCodec.mp3:
+      case DownloadTranscodingCodec.mp3:
         writer.writeByte(1);
-      case FinampTranscodingCodec.opus:
+      case DownloadTranscodingCodec.opus:
         writer.writeByte(2);
-      case FinampTranscodingCodec.original:
+      case DownloadTranscodingCodec.original:
         writer.writeByte(3);
     }
   }
@@ -2372,44 +2382,44 @@ class KeepScreenOnOptionAdapter extends TypeAdapter<KeepScreenOnOption> {
 }
 
 class FinampTranscodingStreamingFormatAdapter
-    extends TypeAdapter<FinampTranscodingStreamingFormat> {
+    extends TypeAdapter<StreamingTranscodingFormat> {
   @override
   final typeId = 73;
 
   @override
-  FinampTranscodingStreamingFormat read(BinaryReader reader) {
+  StreamingTranscodingFormat read(BinaryReader reader) {
     switch (reader.readByte()) {
       case 0:
-        return FinampTranscodingStreamingFormat.aacMpegTS;
+        return StreamingTranscodingFormat.aacMpegTS;
       case 1:
-        return FinampTranscodingStreamingFormat.aacFragmentedMp4;
+        return StreamingTranscodingFormat.aacFragmentedMp4;
       case 2:
-        return FinampTranscodingStreamingFormat.opusFragmentedMp4;
+        return StreamingTranscodingFormat.opusFragmentedMp4;
       case 3:
-        return FinampTranscodingStreamingFormat.flacFragmentedMp4;
+        return StreamingTranscodingFormat.flacFragmentedMp4;
       case 4:
-        return FinampTranscodingStreamingFormat.vorbisMpegTS;
+        return StreamingTranscodingFormat.vorbisMpegTS;
       case 5:
-        return FinampTranscodingStreamingFormat.vorbisFragmentedMp4;
+        return StreamingTranscodingFormat.vorbisFragmentedMp4;
       default:
-        return FinampTranscodingStreamingFormat.aacMpegTS;
+        return StreamingTranscodingFormat.aacMpegTS;
     }
   }
 
   @override
-  void write(BinaryWriter writer, FinampTranscodingStreamingFormat obj) {
+  void write(BinaryWriter writer, StreamingTranscodingFormat obj) {
     switch (obj) {
-      case FinampTranscodingStreamingFormat.aacMpegTS:
+      case StreamingTranscodingFormat.aacMpegTS:
         writer.writeByte(0);
-      case FinampTranscodingStreamingFormat.aacFragmentedMp4:
+      case StreamingTranscodingFormat.aacFragmentedMp4:
         writer.writeByte(1);
-      case FinampTranscodingStreamingFormat.opusFragmentedMp4:
+      case StreamingTranscodingFormat.opusFragmentedMp4:
         writer.writeByte(2);
-      case FinampTranscodingStreamingFormat.flacFragmentedMp4:
+      case StreamingTranscodingFormat.flacFragmentedMp4:
         writer.writeByte(3);
-      case FinampTranscodingStreamingFormat.vorbisMpegTS:
+      case StreamingTranscodingFormat.vorbisMpegTS:
         writer.writeByte(4);
-      case FinampTranscodingStreamingFormat.vorbisFragmentedMp4:
+      case StreamingTranscodingFormat.vorbisFragmentedMp4:
         writer.writeByte(5);
     }
   }
@@ -2987,6 +2997,48 @@ class PlaybackActionRowPageAdapter extends TypeAdapter<PlaybackActionRowPage> {
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is PlaybackActionRowPageAdapter &&
+          runtimeType == other.runtimeType &&
+          typeId == other.typeId;
+}
+
+class PreferTranscodedDownloadsSettingAdapter
+    extends TypeAdapter<PreferTranscodedDownloadsSetting> {
+  @override
+  final typeId = 109;
+
+  @override
+  PreferTranscodedDownloadsSetting read(BinaryReader reader) {
+    switch (reader.readByte()) {
+      case 0:
+        return PreferTranscodedDownloadsSetting.preferDownloads;
+      case 1:
+        return PreferTranscodedDownloadsSetting.preferStreaming;
+      case 2:
+        return PreferTranscodedDownloadsSetting.preferStreamingIfNotTranscoding;
+      default:
+        return PreferTranscodedDownloadsSetting.preferDownloads;
+    }
+  }
+
+  @override
+  void write(BinaryWriter writer, PreferTranscodedDownloadsSetting obj) {
+    switch (obj) {
+      case PreferTranscodedDownloadsSetting.preferDownloads:
+        writer.writeByte(0);
+      case PreferTranscodedDownloadsSetting.preferStreaming:
+        writer.writeByte(1);
+      case PreferTranscodedDownloadsSetting.preferStreamingIfNotTranscoding:
+        writer.writeByte(2);
+    }
+  }
+
+  @override
+  int get hashCode => typeId.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is PreferTranscodedDownloadsSettingAdapter &&
           runtimeType == other.runtimeType &&
           typeId == other.typeId;
 }
@@ -8303,7 +8355,7 @@ DownloadProfile _downloadProfileDeserialize(
   );
   object.codec =
       _DownloadProfilecodecValueEnumMap[reader.readByteOrNull(offsets[0])] ??
-      FinampTranscodingCodec.aac;
+      DownloadTranscodingCodec.aac;
   object.stereoBitrate = reader.readLong(offsets[2]);
   return object;
 }
@@ -8319,7 +8371,7 @@ P _downloadProfileDeserializeProp<P>(
       return (_DownloadProfilecodecValueEnumMap[reader.readByteOrNull(
                 offset,
               )] ??
-              FinampTranscodingCodec.aac)
+              DownloadTranscodingCodec.aac)
           as P;
     case 1:
       return (reader.readStringOrNull(offset)) as P;
@@ -8337,16 +8389,16 @@ const _DownloadProfilecodecEnumValueMap = {
   'original': 3,
 };
 const _DownloadProfilecodecValueEnumMap = {
-  0: FinampTranscodingCodec.aac,
-  1: FinampTranscodingCodec.mp3,
-  2: FinampTranscodingCodec.opus,
-  3: FinampTranscodingCodec.original,
+  0: DownloadTranscodingCodec.aac,
+  1: DownloadTranscodingCodec.mp3,
+  2: DownloadTranscodingCodec.opus,
+  3: DownloadTranscodingCodec.original,
 };
 
 extension DownloadProfileQueryFilter
     on QueryBuilder<DownloadProfile, DownloadProfile, QFilterCondition> {
   QueryBuilder<DownloadProfile, DownloadProfile, QAfterFilterCondition>
-  codecEqualTo(FinampTranscodingCodec value) {
+  codecEqualTo(DownloadTranscodingCodec value) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
         FilterCondition.equalTo(property: r'codec', value: value),
@@ -8355,7 +8407,7 @@ extension DownloadProfileQueryFilter
   }
 
   QueryBuilder<DownloadProfile, DownloadProfile, QAfterFilterCondition>
-  codecGreaterThan(FinampTranscodingCodec value, {bool include = false}) {
+  codecGreaterThan(DownloadTranscodingCodec value, {bool include = false}) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
         FilterCondition.greaterThan(
@@ -8368,7 +8420,7 @@ extension DownloadProfileQueryFilter
   }
 
   QueryBuilder<DownloadProfile, DownloadProfile, QAfterFilterCondition>
-  codecLessThan(FinampTranscodingCodec value, {bool include = false}) {
+  codecLessThan(DownloadTranscodingCodec value, {bool include = false}) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
         FilterCondition.lessThan(
@@ -8382,8 +8434,8 @@ extension DownloadProfileQueryFilter
 
   QueryBuilder<DownloadProfile, DownloadProfile, QAfterFilterCondition>
   codecBetween(
-    FinampTranscodingCodec lower,
-    FinampTranscodingCodec upper, {
+    DownloadTranscodingCodec lower,
+    DownloadTranscodingCodec upper, {
     bool includeLower = true,
     bool includeUpper = true,
   }) {

@@ -1153,7 +1153,10 @@ class DownloadsService {
       var baseItem = track.track;
       baseItem.mediaSources = [track.mediaSourceInfo];
       var isarItem = DownloadStub.fromItem(type: DownloadItemType.track, item: baseItem).asItem(
-        DownloadProfile(transcodeCodec: FinampTranscodingCodec.original, downloadLocationId: track.downloadLocationId),
+        DownloadProfile(
+          transcodeCodec: DownloadTranscodingCodec.original,
+          downloadLocationId: track.downloadLocationId,
+        ),
       );
       String? newPath;
       if (track.downloadLocationId == null) {
@@ -1161,7 +1164,7 @@ class DownloadsService {
             in FinampSettingsHelper.finampSettings.downloadLocationsMap.entries) {
           if (track.path.contains(entry.value.currentPath)) {
             isarItem.fileTranscodingProfile = DownloadProfile(
-              transcodeCodec: FinampTranscodingCodec.original,
+              transcodeCodec: DownloadTranscodingCodec.original,
               downloadLocationId: entry.key,
             );
             newPath = path_helper.relative(track.path, from: entry.value.currentPath);
@@ -1174,7 +1177,7 @@ class DownloadsService {
         }
       } else {
         isarItem.fileTranscodingProfile = DownloadProfile(
-          transcodeCodec: FinampTranscodingCodec.original,
+          transcodeCodec: DownloadTranscodingCodec.original,
           downloadLocationId: track.downloadLocationId,
         );
         if (track.downloadLocationId ==
@@ -1230,10 +1233,13 @@ class DownloadsService {
         continue;
       }
       var isarItem = DownloadStub.fromItem(type: DownloadItemType.collection, item: parent.item).asItem(
-        DownloadProfile(transcodeCodec: FinampTranscodingCodec.original, downloadLocationId: track.downloadLocationId),
+        DownloadProfile(
+          transcodeCodec: DownloadTranscodingCodec.original,
+          downloadLocationId: track.downloadLocationId,
+        ),
       );
       isarItem.userTranscodingProfile = DownloadProfile(
-        transcodeCodec: FinampTranscodingCodec.original,
+        transcodeCodec: DownloadTranscodingCodec.original,
         downloadLocationId: track.downloadLocationId,
       );
       // This should only be used for IDs/links and does not need real download items.
@@ -1277,7 +1283,7 @@ class DownloadsService {
     await addDownload(
       stub: DownloadStub.fromFinampCollection(FinampCollection(type: FinampCollectionType.allPlaylistsMetadata)),
       transcodeProfile: DownloadProfile(
-        transcodeCodec: FinampTranscodingCodec.original,
+        transcodeCodec: DownloadTranscodingCodec.original,
         downloadLocationId: downloadLocation,
       ),
     );
@@ -1687,7 +1693,7 @@ class DownloadsService {
 
     if (item.type == DownloadItemType.track && item.state.isComplete && required) {
       if (item.fileTranscodingProfile == null ||
-          item.fileTranscodingProfile!.codec != FinampTranscodingCodec.original ||
+          item.fileTranscodingProfile!.codec != DownloadTranscodingCodec.original ||
           item.baseItem?.mediaSources == null) {
         return await file(item)?.stat().then((value) => value.size).catchError((e) {
               Logger("downloadsServiceBackground").fine("No file for track ${item.name} when calculating size.");

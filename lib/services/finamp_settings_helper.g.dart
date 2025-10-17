@@ -323,7 +323,7 @@ extension FinampSetters on FinampSettingsHelper {
   }
 
   static void setDownloadTranscodingCodec(
-    FinampTranscodingCodec? newDownloadTranscodingCodec,
+    DownloadTranscodingCodec? newDownloadTranscodingCodec,
   ) {
     FinampSettings finampSettingsTemp = FinampSettingsHelper.finampSettings;
     finampSettingsTemp.downloadTranscodingCodec = newDownloadTranscodingCodec;
@@ -612,7 +612,7 @@ extension FinampSetters on FinampSettingsHelper {
   }
 
   static void setTranscodingStreamingFormat(
-    FinampTranscodingStreamingFormat newTranscodingStreamingFormat,
+    StreamingTranscodingFormat newTranscodingStreamingFormat,
   ) {
     FinampSettings finampSettingsTemp = FinampSettingsHelper.finampSettings;
     finampSettingsTemp.transcodingStreamingFormat =
@@ -1178,6 +1178,28 @@ extension FinampSetters on FinampSettingsHelper {
     ).put("FinampSettings", finampSettingsTemp);
   }
 
+  static void setPreferTranscodedDownloadsLocal(
+    PreferTranscodedDownloadsSetting newPreferTranscodedDownloadsLocal,
+  ) {
+    FinampSettings finampSettingsTemp = FinampSettingsHelper.finampSettings;
+    finampSettingsTemp.preferTranscodedDownloadsLocal =
+        newPreferTranscodedDownloadsLocal;
+    Hive.box<FinampSettings>(
+      "FinampSettings",
+    ).put("FinampSettings", finampSettingsTemp);
+  }
+
+  static void setPreferTranscodedDownloadsRemote(
+    PreferTranscodedDownloadsSetting newPreferTranscodedDownloadsRemote,
+  ) {
+    FinampSettings finampSettingsTemp = FinampSettingsHelper.finampSettings;
+    finampSettingsTemp.preferTranscodedDownloadsRemote =
+        newPreferTranscodedDownloadsRemote;
+    Hive.box<FinampSettings>(
+      "FinampSettings",
+    ).put("FinampSettings", finampSettingsTemp);
+  }
+
   static void setBufferDuration(Duration newBufferDuration) {
     FinampSettings finampSettingsTemp = FinampSettingsHelper.finampSettings;
     finampSettingsTemp.bufferDuration = newBufferDuration;
@@ -1286,7 +1308,7 @@ extension FinampSettingsProviderSelectors on StreamProvider<FinampSettings> {
       finampSettingsProvider.select(
         (value) => value.requireValue.hasCompletedIsarUserMigration,
       );
-  ProviderListenable<FinampTranscodingCodec?> get downloadTranscodingCodec =>
+  ProviderListenable<DownloadTranscodingCodec?> get downloadTranscodingCodec =>
       finampSettingsProvider.select(
         (value) => value.requireValue.downloadTranscodingCodec,
       );
@@ -1393,7 +1415,7 @@ extension FinampSettingsProviderSelectors on StreamProvider<FinampSettings> {
       finampSettingsProvider.select(
         (value) => value.requireValue.hasDownloadedPlaylistInfo,
       );
-  ProviderListenable<FinampTranscodingStreamingFormat>
+  ProviderListenable<StreamingTranscodingFormat>
   get transcodingStreamingFormat => finampSettingsProvider.select(
     (value) => value.requireValue.transcodingStreamingFormat,
   );
@@ -1588,6 +1610,14 @@ extension FinampSettingsProviderSelectors on StreamProvider<FinampSettings> {
       finampSettingsProvider.select(
         (value) => value.requireValue.hasCompletedThemeModeLocaleMigration,
       );
+  ProviderListenable<PreferTranscodedDownloadsSetting>
+  get preferTranscodedDownloadsLocal => finampSettingsProvider.select(
+    (value) => value.requireValue.preferTranscodedDownloadsLocal,
+  );
+  ProviderListenable<PreferTranscodedDownloadsSetting>
+  get preferTranscodedDownloadsRemote => finampSettingsProvider.select(
+    (value) => value.requireValue.preferTranscodedDownloadsRemote,
+  );
   ProviderListenable<DownloadProfile> get downloadTranscodingProfile =>
       finampSettingsProvider.select(
         (value) => value.requireValue.downloadTranscodingProfile,

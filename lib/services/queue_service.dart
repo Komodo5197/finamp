@@ -387,11 +387,15 @@ class QueueService {
           info.previousTracks + ((info.currentTrack == null) ? [] : [info.currentTrack!]) + info.nextUp + info.queue;
       Map<jellyfin_models.BaseItemId, jellyfin_models.BaseItemDto> idMap = existingItems ?? {};
 
+      // Get list of unique ids that do not yet have an associated item.
+      List<jellyfin_models.BaseItemId> missingIds = allIds.toSet().difference(idMap.keys.toSet()).toList();
+
       // If queue source is playlist, fetch via parent to retrieve metadata needed
       // for removal from playlist via queueItem
       if (!FinampSettingsHelper.finampSettings.isOffline &&
           info.source?.type == QueueItemSourceType.playlist &&
-          info.source?.item != null) {
+          info.source?.item != null &&
+          missingIds.isNotEmpty) {
         try {
           var itemList =
               await _jellyfinApiHelper.getItems(
@@ -407,9 +411,6 @@ class QueueService {
           _queueServiceLogger.warning("Error loading queue source playlist, continuing anyway.  Error: $e");
         }
       }
-
-      // Get list of unique ids that do not yet have an associated item.
-      List<jellyfin_models.BaseItemId> missingIds = allIds.toSet().difference(idMap.keys.toSet()).toList();
 
       if (FinampSettingsHelper.finampSettings.isOffline) {
         for (var id in missingIds) {

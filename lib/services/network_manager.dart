@@ -64,6 +64,9 @@ class AutoOffline extends _$AutoOffline {
     bool preferLocalNetwork =
         ref.watch(FinampUserHelper.finampCurrentUserProvider).valueOrNull?.preferLocalNetwork ??
         DefaultSettings.preferLocalNetwork;
+    bool preferTranscodedDownloads =
+        ref.watch(finampSettingsProvider.preferTranscodedDownloadsRemote) !=
+        ref.watch(finampSettingsProvider.preferTranscodedDownloadsLocal);
 
     // Why this integer magic?
     // If the function would return a bool aka. `(autoOfflineEnabled && autoOfflineActive) || autoServerSwitch`
@@ -77,6 +80,7 @@ class AutoOffline extends _$AutoOffline {
     int state = 0;
     if (autoOfflineEnabled && autoOfflineActive) state += 1;
     if (preferLocalNetwork) state += 2;
+    if (preferTranscodedDownloads) state += 4;
 
     return state;
   }

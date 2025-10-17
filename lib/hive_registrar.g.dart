@@ -73,6 +73,7 @@ extension HiveRegistrar on HiveInterface {
     registerAdapter(PlaylistInfoAdapter());
     registerAdapter(PlaylistUserAdapter());
     registerAdapter(PlaylistUsersAdapter());
+    registerAdapter(PreferTranscodedDownloadsSettingAdapter());
     registerAdapter(ProfileConditionAdapter());
     registerAdapter(QueueItemAdapter());
     registerAdapter(QueueItemQueueTypeAdapter());
@@ -172,6 +173,7 @@ extension IsolatedHiveRegistrar on IsolatedHiveInterface {
     registerAdapter(PlaylistInfoAdapter());
     registerAdapter(PlaylistUserAdapter());
     registerAdapter(PlaylistUsersAdapter());
+    registerAdapter(PreferTranscodedDownloadsSettingAdapter());
     registerAdapter(ProfileConditionAdapter());
     registerAdapter(QueueItemAdapter());
     registerAdapter(QueueItemQueueTypeAdapter());

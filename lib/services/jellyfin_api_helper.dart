@@ -15,6 +15,7 @@ import 'package:http/io_client.dart' as http;
 import 'package:isar/isar.dart';
 import 'package:logging/logging.dart';
 import 'package:path_provider/path_provider.dart';
+
 import '../models/finamp_models.dart';
 import '../models/jellyfin_models.dart';
 import 'downloads_service.dart';
@@ -1116,7 +1117,7 @@ class JellyfinApiHelper {
   Uri getTrackDownloadUrl({required BaseItemDto item, required DownloadProfile? transcodingProfile}) {
     Uri uri = Uri.parse(_finampUserHelper.currentUser!.baseURL);
 
-    if (transcodingProfile != null && transcodingProfile.codec != FinampTranscodingCodec.original) {
+    if (transcodingProfile != null && transcodingProfile.codec != DownloadTranscodingCodec.original) {
       // uri.queryParameters is unmodifiable, so we copy the contents into a new
       // map
       final queryParameters = Map.of(uri.queryParameters);

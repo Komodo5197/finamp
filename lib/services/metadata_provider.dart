@@ -62,17 +62,17 @@ final AutoDisposeFutureProviderFamily<MetadataProvider?, BaseItemDto> metadataPr
           var profile = downloadItem.fileTranscodingProfile;
           // We could explicitly get a mediaSource of type Default, but just grabbing
           // the first seems to generally work?
-          var codec = profile?.codec != FinampTranscodingCodec.original
+          var codec = profile?.codec != DownloadTranscodingCodec.original
               ? profile?.codec.name
               : downloadItem.baseItem!.mediaSources?.first.container;
-          var bitrate = profile?.codec != FinampTranscodingCodec.original
+          var bitrate = profile?.codec != DownloadTranscodingCodec.original
               ? profile?.stereoBitrate
               : downloadItem.baseItem!.mediaSources?.first.bitrate;
 
           // We cannot create accurate MediaStreams for a transcoded item,so
           // just return the lyrics stream, as those are not affected and will not
           // be shown if the mediaStream is not present
-          List<MediaStream> mediaStream = profile?.codec != FinampTranscodingCodec.original
+          List<MediaStream> mediaStream = profile?.codec != DownloadTranscodingCodec.original
               ? downloadItem.baseItem!.mediaStreams?.where((x) => x.type == "Lyric").toList() ?? []
               : downloadItem.baseItem!.mediaStreams ?? [];
 

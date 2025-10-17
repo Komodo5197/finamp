@@ -1,7 +1,7 @@
 import 'dart:io';
 
-import 'package:flutter/material.dart';
 import 'package:finamp/l10n/app_localizations.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../components/TranscodingSettingsScreen/bitrate_selector.dart';
@@ -109,12 +109,12 @@ class DownloadTranscodeCodecDropdownListTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return ListTile(
       title: Text(AppLocalizations.of(context)!.downloadTranscodeCodecTitle),
-      trailing: DropdownButton<FinampTranscodingCodec>(
+      trailing: DropdownButton<DownloadTranscodingCodec>(
         value: ref.watch(finampSettingsProvider.downloadTranscodingProfile).codec,
-        items: FinampTranscodingCodec.values
+        items: DownloadTranscodingCodec.values
             .where((element) => !Platform.isIOS || element.iosCompatible)
-            .where((element) => element != FinampTranscodingCodec.original)
-            .map((e) => DropdownMenuItem<FinampTranscodingCodec>(value: e, child: Text(e.name.toUpperCase())))
+            .where((element) => element != DownloadTranscodingCodec.original)
+            .map((e) => DropdownMenuItem<DownloadTranscodingCodec>(value: e, child: Text(e.name.toUpperCase())))
             .toList(),
         onChanged: FinampSetters.setDownloadTranscodingCodec,
       ),
@@ -130,11 +130,11 @@ class StreamingTranscodingFormatDropdownListTile extends ConsumerWidget {
     return ListTile(
       title: Text(AppLocalizations.of(context)!.transcodingStreamingFormatTitle),
       subtitle: Text(AppLocalizations.of(context)!.transcodingStreamingFormatSubtitle),
-      trailing: DropdownButton<FinampTranscodingStreamingFormat>(
+      trailing: DropdownButton<StreamingTranscodingFormat>(
         value: ref.watch(finampSettingsProvider.transcodingStreamingFormat),
-        items: FinampTranscodingStreamingFormat.values
+        items: StreamingTranscodingFormat.values
             .map(
-              (e) => DropdownMenuItem<FinampTranscodingStreamingFormat>(
+              (e) => DropdownMenuItem<StreamingTranscodingFormat>(
                 value: e,
                 child: Text("${e.codec}+${e.container}".toUpperCase()),
               ),

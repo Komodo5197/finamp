@@ -164,7 +164,7 @@ class DefaultSettings {
   static const keepScreenOnOption = KeepScreenOnOption.whileLyrics;
   static const keepScreenOnWhilePluggedIn = true;
   static const hasDownloadedPlaylistInfo = false;
-  static const transcodingStreamingFormat = FinampTranscodingStreamingFormat.aacFragmentedMp4;
+  static const transcodingStreamingFormat = StreamingTranscodingFormat.aacFragmentedMp4;
   static const featureChipsConfiguration = FinampFeatureChipsConfiguration(
     enabled: true,
     features: [
@@ -234,6 +234,8 @@ class DefaultSettings {
   static const preferNextUpPrepending = true;
   static const rememberLastUsedPlaybackActionRowPage = true;
   static const lastUsedPlaybackActionRowPage = PlaybackActionRowPage.newQueue;
+  static const preferTranscodedDownloadsLocal = PreferTranscodedDownloadsSetting.preferDownloads;
+  static const preferTranscodedDownloadsRemote = PreferTranscodedDownloadsSetting.preferDownloads;
 }
 
 @HiveType(typeId: 28)
@@ -369,6 +371,8 @@ class FinampSettings {
     this.locale = DefaultSettings.locale,
     // !!! Don't touch this default value, it's supposed to be hard coded to run the migration only once
     this.hasCompletedThemeModeLocaleMigration = true,
+    this.preferTranscodedDownloadsLocal = DefaultSettings.preferTranscodedDownloadsLocal,
+    this.preferTranscodedDownloadsRemote = DefaultSettings.preferTranscodedDownloadsRemote,
   });
 
   @HiveField(0, defaultValue: DefaultSettings.isOffline)
@@ -504,7 +508,7 @@ class FinampSettings {
   bool hasCompletedIsarUserMigration;
 
   @HiveField(43)
-  FinampTranscodingCodec? downloadTranscodingCodec;
+  DownloadTranscodingCodec? downloadTranscodingCodec;
 
   @HiveField(44, defaultValue: DefaultSettings.shouldTranscodeDownloads)
   TranscodeDownloadsSetting shouldTranscodeDownloads;
@@ -602,7 +606,7 @@ class FinampSettings {
   bool hasDownloadedPlaylistInfo;
 
   @HiveField(75, defaultValue: DefaultSettings.transcodingStreamingFormat)
-  FinampTranscodingStreamingFormat transcodingStreamingFormat;
+  StreamingTranscodingFormat transcodingStreamingFormat;
 
   @HiveField(76, defaultValue: DefaultSettings.featureChipsConfiguration)
   FinampFeatureChipsConfiguration featureChipsConfiguration;
@@ -792,6 +796,12 @@ class FinampSettings {
   // !!! don't touch this default value, it's supposed to be hard coded to run the migration only once
   @HiveField(135, defaultValue: false)
   bool hasCompletedThemeModeLocaleMigration;
+
+  @HiveField(136, defaultValue: DefaultSettings.preferTranscodedDownloadsLocal)
+  PreferTranscodedDownloadsSetting preferTranscodedDownloadsLocal;
+
+  @HiveField(137, defaultValue: DefaultSettings.preferTranscodedDownloadsRemote)
+  PreferTranscodedDownloadsSetting preferTranscodedDownloadsRemote;
 
   static Future<FinampSettings> create() async {
     final downloadLocation = await DownloadLocation.create(
@@ -2319,9 +2329,9 @@ enum DownloadLocationType {
 }
 
 @HiveType(typeId: 65)
-enum FinampTranscodingCodec {
+enum DownloadTranscodingCodec {
   @HiveField(0)
-  aac("aac", true, 1.2),
+  aac("aac", true, 1.3),
   @HiveField(1)
   mp3("mp3", true, 1.0),
   @HiveField(2)
@@ -2330,7 +2340,7 @@ enum FinampTranscodingCodec {
   // Container is null to fall back to real original container per track
   original(null, true, 99999999);
 
-  const FinampTranscodingCodec(this.container, this.iosCompatible, this.quality);
+  const DownloadTranscodingCodec(this.container, this.iosCompatible, this.quality);
 
   /// The container to use for the given codec
   final String? container;
@@ -2343,16 +2353,16 @@ enum FinampTranscodingCodec {
 
 @embedded
 class DownloadProfile {
-  DownloadProfile({FinampTranscodingCodec? transcodeCodec, int? bitrate, this.downloadLocationId}) {
+  DownloadProfile({DownloadTranscodingCodec? transcodeCodec, int? bitrate, this.downloadLocationId}) {
     codec =
         transcodeCodec ??
-        (Platform.isIOS || Platform.isMacOS ? FinampTranscodingCodec.aac : FinampTranscodingCodec.opus);
+        (Platform.isIOS || Platform.isMacOS ? DownloadTranscodingCodec.aac : DownloadTranscodingCodec.opus);
     stereoBitrate = bitrate ?? (Platform.isIOS || Platform.isMacOS ? 256000 : 128000);
   }
 
   /// The codec to use for the given transcoding job
   @Enumerated(EnumType.ordinal)
-  late FinampTranscodingCodec codec;
+  late DownloadTranscodingCodec codec;
 
   /// The bitrate of the file, in bits per second (i.e. 320000 for 320kbps).
   /// This bitrate is used for stereo, use [bitrateChannels] to get a
@@ -2386,12 +2396,12 @@ class DownloadProfile {
   String get bitrateKbps => "${stereoBitrate ~/ 1000}kbps";
 
   @ignore
-  double get quality => codec == FinampTranscodingCodec.original ? 9999999999999 : codec.quality * stereoBitrate;
+  double get quality => codec == DownloadTranscodingCodec.original ? 9999999999999 : codec.quality * stereoBitrate;
 
   @override
   bool operator ==(Object other) {
     return other is DownloadProfile &&
-        (codec == FinampTranscodingCodec.original || other.stereoBitrate == stereoBitrate) &&
+        (codec == DownloadTranscodingCodec.original || other.stereoBitrate == stereoBitrate) &&
         other.codec == codec &&
         other.downloadLocationId == downloadLocationId;
   }
@@ -2399,7 +2409,7 @@ class DownloadProfile {
   @override
   @ignore
   int get hashCode =>
-      Object.hash(codec == FinampTranscodingCodec.original ? 0 : stereoBitrate, codec, downloadLocationId);
+      Object.hash(codec == DownloadTranscodingCodec.original ? 0 : stereoBitrate, codec, downloadLocationId);
 }
 
 @HiveType(typeId: 66)
@@ -2695,26 +2705,54 @@ enum KeepScreenOnOption {
 }
 
 @HiveType(typeId: 73)
-enum FinampTranscodingStreamingFormat {
+enum StreamingTranscodingFormat {
   @HiveField(0)
-  aacMpegTS("aac", "ts"),
+  aacMpegTS("aac", "ts", 1.3),
   @HiveField(1)
-  aacFragmentedMp4("aac", "mp4"),
+  aacFragmentedMp4("aac", "mp4", 1.3),
   @HiveField(2)
-  opusFragmentedMp4("opus", "mp4"),
+  opusFragmentedMp4("opus", "mp4", 2.0),
   @HiveField(3)
-  flacFragmentedMp4("flac", "mp4"),
+  flacFragmentedMp4("flac", "mp4", 99999999),
   @HiveField(4)
-  vorbisMpegTS("vorbis", "ts"),
+  vorbisMpegTS("vorbis", "ts", 1.2),
   @HiveField(5)
-  vorbisFragmentedMp4("vorbis", "mp4");
+  vorbisFragmentedMp4("vorbis", "mp4", 1.2);
 
-  const FinampTranscodingStreamingFormat(this.codec, this.container);
+  const StreamingTranscodingFormat(this.codec, this.container, this.quality);
 
   final String codec;
 
   /// The container to use to transport the segments
   final String container;
+
+  final double quality;
+}
+
+class StreamingTranscodeSetting {
+  StreamingTranscodeSetting._(this.format, this.bitrate);
+
+  static StreamingTranscodeSetting? fromSettings() {
+    if (!FinampSettingsHelper.finampSettings.shouldTranscode) return null;
+    return StreamingTranscodeSetting._(
+      FinampSettingsHelper.finampSettings.transcodingStreamingFormat,
+      FinampSettingsHelper.finampSettings.transcodeBitrate,
+    );
+  }
+
+  static StreamingTranscodeSetting? fromString(String? setting) {
+    final settings = setting?.split("#");
+    if (settings?.length != 2) return null;
+    return StreamingTranscodeSetting._(
+      StreamingTranscodingFormat.values.firstWhere((x) => x.name == settings![0]),
+      int.parse(settings![1]),
+    );
+  }
+
+  String asString() => "${format.name}#$bitrate";
+
+  final StreamingTranscodingFormat format;
+  final int bitrate;
 }
 
 @HiveType(typeId: 74)
@@ -3610,4 +3648,14 @@ class RawThemeResult {
   @HiveField(1)
   final int _backgroundInt;
   Color get background => Color(_backgroundInt);
+}
+
+@HiveType(typeId: 109)
+enum PreferTranscodedDownloadsSetting {
+  @HiveField(0)
+  preferDownloads,
+  @HiveField(1)
+  preferStreaming,
+  @HiveField(2)
+  preferStreamingIfNotTranscoding,
 }

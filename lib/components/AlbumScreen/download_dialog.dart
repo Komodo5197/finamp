@@ -91,7 +91,7 @@ class DownloadDialog extends ConsumerStatefulWidget {
       final downloadsService = GetIt.instance<DownloadsService>();
       var profile = FinampSettingsHelper.finampSettings.shouldTranscodeDownloads == TranscodeDownloadsSetting.always
           ? FinampSettingsHelper.finampSettings.downloadTranscodingProfile
-          : DownloadProfile(transcodeCodec: FinampTranscodingCodec.original);
+          : DownloadProfile(transcodeCodec: DownloadTranscodingCodec.original);
       profile.downloadLocationId = downloadLocation;
 
       FinampSetters.setLastUsedDownloadLocationId(profile.downloadLocationId);
@@ -129,7 +129,7 @@ class _DownloadDialogState extends ConsumerState<DownloadDialog> {
     String originalDescription = "null";
     String transcodeDescription = "null";
     var transcodeProfile = FinampSettingsHelper.finampSettings.downloadTranscodingProfile;
-    var originalProfile = DownloadProfile(transcodeCodec: FinampTranscodingCodec.original);
+    var originalProfile = DownloadProfile(transcodeCodec: DownloadTranscodingCodec.original);
 
     if (widget.children != null) {
       final transcodedFileSize = widget.children!

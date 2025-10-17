@@ -147,7 +147,7 @@ class FinampSettingsHelper {
     finampSettingsTemp.transcodingStreamingFormat = DefaultSettings.transcodingStreamingFormat;
     finampSettingsTemp.shouldTranscodeDownloads = DefaultSettings.shouldTranscodeDownloads;
     finampSettingsTemp.downloadTranscodingCodec =
-        FinampTranscodingCodec.opus; // starts uninitilized, idk what value this should be
+        DownloadTranscodingCodec.opus; // starts uninitilized, idk what value this should be
     finampSettingsTemp.downloadTranscodeBitrate = 128000; // starts uninitilized, idk what value this should be
 
     Hive.box<FinampSettings>("FinampSettings").put("FinampSettings", finampSettingsTemp);
