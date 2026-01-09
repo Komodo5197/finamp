@@ -74,17 +74,12 @@ class KeepScreenOnHelper {
           break;
       }
     }
-
-    _keepScreenOnLogger.fine(
-      "keepingScreenOn: $_keepingScreenOn | mainSetting: ${FinampSettingsHelper.finampSettings.keepScreenOnOption} | whilePluggedInSetting: ${FinampSettingsHelper.finampSettings.keepScreenOnWhilePluggedIn} | isPlaying: $_isPlaying | lyricsShowing: $_isLyricsShowing | isPluggedIn: $_isPluggedIn",
-    );
   }
 
   void setCondition({bool? isPlaying, bool? isLyricsShowing, BatteryState? batteryState}) {
     if (isPlaying != null) _isPlaying = isPlaying;
     if (isLyricsShowing != null) _isLyricsShowing = isLyricsShowing;
     if (batteryState != null) {
-      _keepScreenOnLogger.fine("reported battery state: $batteryState");
       switch (batteryState) {
         case BatteryState.charging:
         case BatteryState.connectedNotCharging:

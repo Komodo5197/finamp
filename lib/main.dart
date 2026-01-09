@@ -4,7 +4,6 @@ import 'dart:ui';
 
 import 'package:app_links/app_links.dart';
 import 'package:audio_service/audio_service.dart';
-import 'package:audio_session/audio_session.dart';
 import 'package:background_downloader/background_downloader.dart';
 import 'package:finamp/color_schemes.g.dart';
 import 'package:finamp/components/Buttons/cta_medium.dart';
@@ -35,7 +34,6 @@ import 'package:finamp/services/dbus_manager.dart';
 import 'package:finamp/services/discord_rpc.dart';
 import 'package:finamp/services/downloads_service.dart';
 import 'package:finamp/services/downloads_service_backend.dart';
-import 'package:finamp/services/feedback_helper.dart';
 import 'package:finamp/services/finamp_logs_helper.dart';
 import 'package:finamp/services/finamp_settings_helper.dart';
 import 'package:finamp/services/finamp_user_helper.dart';
@@ -236,7 +234,17 @@ Future<void> _setupDownloadsHelper() async {
 
   await _migrateDownloadsFileOwner();
 
-  await fileDownloader.configure(globalConfig: (Config.checkAvailableSpace, 1024));
+  await fileDownloader.configure(
+    globalConfig: [
+      (Config.checkAvailableSpace, 1024),
+      (Config.holdingQueue, (FinampSettingsHelper.finampSettings.maxConcurrentDownloads, null, null)),
+      (Config.runInForeground, Config.always),
+    ],
+  );
+  fileDownloader.configureNotification(
+    running: TaskNotification("Downloading tracks", "{numFinished}/{numTotal}"),
+    groupNotificationId: 'default',
+  );
   await fileDownloader.resumeFromBackground();
   await downloadsService.startQueues();
 

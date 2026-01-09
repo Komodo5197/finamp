@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:background_downloader/background_downloader.dart';
 import 'package:finamp/components/AlbumScreen/download_button.dart';
 import 'package:finamp/components/global_snackbar.dart';
 import 'package:finamp/l10n/app_localizations.dart';
@@ -201,12 +202,15 @@ class ConcurentDownloadsSelector extends ConsumerWidget {
               ),
               Slider(
                 min: 1,
-                max: 25,
+                max: 100,
                 value: ref.watch(finampSettingsProvider.maxConcurrentDownloads).clamp(1, 25).toDouble(),
                 label: AppLocalizations.of(
                   context,
                 )!.maxConcurrentDownloadsLabel(ref.watch(finampSettingsProvider.maxConcurrentDownloads).toString()),
-                onChanged: (value) => FinampSetters.setMaxConcurrentDownloads(value.toInt()),
+                onChanged: (value) {
+                  FinampSetters.setMaxConcurrentDownloads(value.toInt());
+                  FileDownloader().configure(globalConfig: (Config.holdingQueue, (value.toInt(), null, null)));
+                },
                 autofocus: false,
                 focusNode: FocusNode(skipTraversal: true, canRequestFocus: false),
               ),

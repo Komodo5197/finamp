@@ -279,6 +279,7 @@ class IsarTaskQueue implements TaskQueue {
         _enqueueLog.info("Marking download ${item.name} as complete on startup.");
       }
       for (var item in needsEnqueue) {
+        // TODO change this.  Trying to change thousands from downloading to enqueued during startup causes freeze.
         _downloadsService.updateItemState(item, DownloadItemState.enqueued);
         _enqueueLog.info("Re-enqueueing download ${item.name} on startup.");
       }
@@ -311,77 +312,77 @@ class IsarTaskQueue implements TaskQueue {
             .stateEqualTo(DownloadItemState.enqueued)
             .filter()
             .allOf(_activeDownloads, (q, element) => q.not().isarIdEqualTo(element))
-            .limit(20)
+            .limit(200)
             .findAllSync();
         if (nextTasks.isEmpty || !_downloadsService.allowDownloads || FinampSettingsHelper.finampSettings.isOffline) {
           return;
         }
-        for (var task in nextTasks) {
+        final List<DownloadItem> failedTasks = [];
+        final downloadTasks = nextTasks.map((task) {
           if (task.file == null) {
             _enqueueLog.severe("Received ${task.name} with no valid file path.");
-            _isar.writeTxnSync(() {
+            failedTasks.add(task);
+            return null;
+          }
+          _activeDownloads.add(task.isarId);
+          try {
+            // Base URL shouldn't be null at this point (user has to be logged in
+            // to get to the point where they can add downloads).
+            var url = switch (task.type) {
+              DownloadItemType.track =>
+                _jellyfinApiData
+                    .getTrackDownloadUrl(item: task.baseItem!, transcodingProfile: task.fileTranscodingProfile)
+                    .toString(),
+              DownloadItemType.image =>
+                _jellyfinApiData
+                    .getImageUrl(
+                      item: task.baseItem!,
+                      // Download original file
+                      quality: null,
+                      format: null,
+                    )
+                    .toString(),
+              _ => throw StateError("Invalid enqueue ${task.name} which is a ${task.type}"),
+            };
+            return DownloadTask(
+              taskId: task.isarId.toString(),
+              url: url,
+              displayName: task.name,
+              baseDirectory: task.fileDownloadLocation!.baseDirectory.baseDirectory,
+              retries: 3,
+              directory: path_helper.dirname(task.path!),
+              headers: {"Authorization": _finampUserHelper.authorizationHeader},
+              filename: path_helper.basename(task.path!),
+              priority: 0,
+            );
+          } catch (e) {
+            _enqueueLog.severe("Error creating download task for ${task.name}: $e.", e);
+            failedTasks.add(task);
+            return null;
+          }
+        });
+
+        if (failedTasks.isNotEmpty) {
+          _isar.writeTxnSync(() {
+            for (var task in failedTasks) {
               _downloadsService.updateItemState(task, DownloadItemState.failed);
-            });
-            continue;
-          }
-          while (_activeDownloads.length >= FinampSettingsHelper.finampSettings.maxConcurrentDownloads ||
-              _finampUserHelper.currentUser == null) {
-            await Future.delayed(const Duration(milliseconds: 500));
-          }
-          await SchedulerBinding.instance.scheduleTask(() {
-            _activeDownloads.add(task.isarId);
-            try {
-              // Base URL shouldn't be null at this point (user has to be logged in
-              // to get to the point where they can add downloads).
-              var url = switch (task.type) {
-                DownloadItemType.track =>
-                  _jellyfinApiData
-                      .getTrackDownloadUrl(item: task.baseItem!, transcodingProfile: task.fileTranscodingProfile)
-                      .toString(),
-                DownloadItemType.image =>
-                  _jellyfinApiData
-                      .getImageUrl(
-                        item: task.baseItem!,
-                        // Download original file
-                        quality: null,
-                        format: null,
-                      )
-                      .toString(),
-                _ => throw StateError("Invalid enqueue ${task.name} which is a ${task.type}"),
-              };
-              _enqueueLog.fine("Submitting download ${task.name} to background_downloader.");
-              var downloadTask = DownloadTask(
-                taskId: task.isarId.toString(),
-                url: url,
-                displayName: task.name,
-                baseDirectory: task.fileDownloadLocation!.baseDirectory.baseDirectory,
-                retries: 3,
-                directory: path_helper.dirname(task.path!),
-                headers: {"Authorization": _finampUserHelper.authorizationHeader},
-                filename: path_helper.basename(task.path!),
-              );
-              return Future.sync(() async {
-                //bool success = await FileDownloader().resume(downloadTask);
-                //if (!success) {
-                bool success = await FileDownloader().enqueue(downloadTask);
-                //}
-                if (!success) {
-                  // We currently have no way to recover here.  The user must re-sync to clear
-                  // the stuck download.
-                  _enqueueLog.severe("Task ${task.name} failed to enqueue with background_downloader.");
-                }
-              });
-            } catch (e) {
-              _enqueueLog.severe("Error creating download task for ${task.name}: $e.", e);
-              _isar.writeTxnSync(() {
-                _downloadsService.updateItemState(task, DownloadItemState.failed);
-              });
             }
-            // Set priority high to prevent stalling
-          }, Priority.animation + 50);
-          // This helps prevent choking the method channel, see MemoryTaskQueue
-          await Future.delayed(const Duration(milliseconds: 20));
+          });
         }
+
+        await SchedulerBinding.instance.scheduleTask(() async {
+          try {
+            List<bool> success = await FileDownloader().enqueueAll(downloadTasks.nonNulls);
+            if (success.any((x) => !x)) {
+              _enqueueLog.severe("Task failed to enqueue with background_downloader.");
+            }
+          } catch (e) {
+            _enqueueLog.severe("Error submitting download tasks: $e.", e);
+          }
+          // Set priority high to prevent stalling
+        }, Priority.animation + 50);
+        // This helps prevent choking the method channel, see MemoryTaskQueue
+        await Future.delayed(const Duration(milliseconds: 50));
       }
     } finally {
       _callbacksComplete?.complete();
@@ -426,9 +427,9 @@ class IsarTaskQueue implements TaskQueue {
 
   // We do not currently pause or resume the downloads
   @override
-  Future<void> pauseAll() async {}
+  Future<void> pauseAll({String? group, Iterable<DownloadTask>? tasks}) async {}
   @override
-  Future<void> resumeAll() async {}
+  Future<void> resumeAll({String? group, Iterable<DownloadTask>? tasks}) async {}
 }
 
 /// A class for storing pending deletes in Isar.  This is used to save unlinked
