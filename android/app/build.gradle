@@ -77,7 +77,7 @@ android {
         }
         profile {
             // https://github.com/flutter/flutter/issues/169215
-            // applicationIdSuffix '.profile'
+            applicationIdSuffix '.profile'
             minifyEnabled true // avoid dexing issues
             resValue "string", "app_name", "Finamp Profile"
         }

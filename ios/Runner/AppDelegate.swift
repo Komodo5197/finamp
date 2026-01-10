@@ -23,6 +23,8 @@ import Flutter
             AppLinks.shared.handleLink(url: url)
             return true  // Returning true will stop the propagation to other packages
         }
+
+        UNUserNotificationCenter.current().delegate = self as UNUserNotificationCenterDelegate
         
         return super.application(application, didFinishLaunchingWithOptions: launchOptions)
     }
