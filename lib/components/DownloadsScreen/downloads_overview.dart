@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 
 import '../../models/finamp_models.dart';
-import '../../services/downloads_service.dart';
+import '../../services/downloads_service/downloads_service.dart';
 import '../global_snackbar.dart';
 
 const double downloadsOverviewCardLoadingHeight = 120;

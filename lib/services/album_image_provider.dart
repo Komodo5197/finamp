@@ -17,7 +17,7 @@ import 'package:path/path.dart' as path_helper;
 import 'package:path_provider/path_provider.dart';
 
 import '../models/jellyfin_models.dart';
-import 'downloads_service.dart';
+import 'downloads_service/downloads_service.dart';
 import 'finamp_settings_helper.dart';
 import 'jellyfin_api_helper.dart';
 

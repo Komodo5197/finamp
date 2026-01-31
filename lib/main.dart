@@ -4,7 +4,6 @@ import 'dart:ui';
 
 import 'package:app_links/app_links.dart';
 import 'package:audio_service/audio_service.dart';
-import 'package:audio_session/audio_session.dart';
 import 'package:background_downloader/background_downloader.dart';
 import 'package:finamp/color_schemes.g.dart';
 import 'package:finamp/components/Buttons/cta_medium.dart';
@@ -33,9 +32,9 @@ import 'package:finamp/services/audio_service_smtc.dart';
 import 'package:finamp/services/data_source_service.dart';
 import 'package:finamp/services/dbus_manager.dart';
 import 'package:finamp/services/discord_rpc.dart';
-import 'package:finamp/services/downloads_service.dart';
-import 'package:finamp/services/downloads_service_backend.dart';
-import 'package:finamp/services/feedback_helper.dart';
+import 'package:finamp/services/downloads_service/downloads_service.dart';
+import 'package:finamp/services/downloads_service/downloads_service_foreground.dart';
+import 'package:finamp/services/downloads_service/downloads_service_utils.dart';
 import 'package:finamp/services/finamp_logs_helper.dart';
 import 'package:finamp/services/finamp_settings_helper.dart';
 import 'package:finamp/services/finamp_user_helper.dart';
@@ -195,7 +194,7 @@ Future<void> _setupEdgeToEdgeOverlayStyle() async {
 }
 
 Future<void> _setupJellyfinApiData() async {
-  GetIt.instance.registerSingleton(JellyfinApiHelper());
+  GetIt.instance.registerSingleton(JellyfinApiHelper(inBackground: false));
 }
 
 void _setupOfflineListenLogHelper() {

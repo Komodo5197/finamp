@@ -2,10 +2,10 @@ import 'package:audio_service/audio_service.dart';
 import 'package:collection/collection.dart';
 import 'package:finamp/components/MusicScreen/music_screen_tab_view.dart';
 import 'package:finamp/components/global_snackbar.dart';
+import 'package:finamp/l10n/app_localizations.dart';
 import 'package:finamp/models/finamp_models.dart';
 import 'package:finamp/models/jellyfin_models.dart';
-import 'package:finamp/services/downloads_service.dart';
-import 'package:finamp/l10n/app_localizations.dart';
+import 'package:finamp/services/downloads_service/downloads_service.dart';
 import 'package:get_it/get_it.dart';
 import 'package:logging/logging.dart';
 

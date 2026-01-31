@@ -7,7 +7,7 @@ import 'package:get_it/get_it.dart';
 
 import '../../models/jellyfin_models.dart';
 import '../../screens/album_screen.dart';
-import '../../services/downloads_service.dart';
+import '../../services/downloads_service/downloads_service.dart';
 import '../../services/finamp_settings_helper.dart';
 import '../../services/jellyfin_api_helper.dart';
 

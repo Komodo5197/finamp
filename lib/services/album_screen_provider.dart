@@ -7,7 +7,7 @@ import 'package:get_it/get_it.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../models/jellyfin_models.dart';
-import 'downloads_service.dart';
+import 'downloads_service/downloads_service.dart';
 import 'finamp_settings_helper.dart';
 import 'jellyfin_api_helper.dart';
 

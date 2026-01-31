@@ -1,5 +1,3 @@
-import 'dart:math';
-
 import 'package:collection/collection.dart';
 import 'package:finamp/models/finamp_models.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,7 +5,7 @@ import 'package:get_it/get_it.dart';
 import 'package:logging/logging.dart';
 
 import '../models/jellyfin_models.dart';
-import 'downloads_service.dart';
+import 'downloads_service/downloads_service.dart';
 import 'finamp_settings_helper.dart';
 import 'jellyfin_api_helper.dart';
 

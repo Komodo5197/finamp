@@ -1,12 +1,12 @@
+import 'package:finamp/l10n/app_localizations.dart';
 import 'package:finamp/services/music_player_background_task.dart';
 import 'package:finamp/services/queue_service.dart';
-import 'package:finamp/l10n/app_localizations.dart';
 import 'package:get_it/get_it.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../components/global_snackbar.dart';
 import '../models/jellyfin_models.dart';
-import 'downloads_service.dart';
+import 'downloads_service/downloads_service.dart';
 import 'feedback_helper.dart';
 import 'finamp_settings_helper.dart';
 import 'jellyfin_api_helper.dart';
@@ -92,7 +92,7 @@ class IsFavorite extends _$IsFavorite {
     });
     state = isFavorite;
     // If the current track is the one being toggled, update the playback state (and media notification)
-    if (item!.id == queueService.getCurrentTrack()?.baseItem?.id) {
+    if (item!.id == queueService.getCurrentTrack()?.baseItem.id) {
       audioHandler.refreshPlaybackStateAndMediaNotification();
     }
     return state;

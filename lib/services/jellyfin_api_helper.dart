@@ -15,16 +15,17 @@ import 'package:http/io_client.dart' as http;
 import 'package:isar/isar.dart';
 import 'package:logging/logging.dart';
 import 'package:path_provider/path_provider.dart';
+
 import '../models/finamp_models.dart';
 import '../models/jellyfin_models.dart';
-import 'downloads_service.dart';
-import 'downloads_service_backend.dart';
+import 'downloads_service/downloads_service.dart';
+import 'downloads_service/downloads_service_utils.dart';
 import 'finamp_settings_helper.dart';
 import 'finamp_user_helper.dart';
 import 'jellyfin_api.dart' as jellyfin_api;
 
 class JellyfinApiHelper {
-  final jellyfinApi = jellyfin_api.JellyfinApi.create(true);
+  late final jellyfinApi = jellyfin_api.JellyfinApi.create(inBackground);
   final _jellyfinApiHelperLogger = Logger("JellyfinApiHelper");
 
   // Stores the ids of the artists that the user selected to mix
@@ -42,13 +43,18 @@ class JellyfinApiHelper {
 
   final _finampUserHelper = GetIt.instance<FinampUserHelper>();
 
-  JellyfinApiHelper() {
-    ReceivePort startupPort = ReceivePort();
-    var rootToken = RootIsolateToken.instance!;
-    Isolate.spawn(_processRequestsBackground, (startupPort.sendPort, rootToken));
-    Future.sync(() async {
-      _workerIsolatePort = await startupPort.first as SendPort?;
-    });
+  final bool inBackground;
+
+  JellyfinApiHelper({required this.inBackground}) {
+    // TODO consider still using background thread in background
+    if (!inBackground) {
+      ReceivePort startupPort = ReceivePort();
+      var rootToken = RootIsolateToken.instance!;
+      Isolate.spawn(_processRequestsBackground, (startupPort.sendPort, rootToken));
+      Future.sync(() async {
+        _workerIsolatePort = await startupPort.first as SendPort?;
+      });
+    }
   }
 
   SendPort? _workerIsolatePort;
@@ -1194,6 +1200,10 @@ class JellyfinApiHelper {
   /// Verify that we are in an appropriate location to make API calls.
   /// This should only be called inside assert() to prevent running in release mode.
   bool _verifyCallable() {
+    if (inBackground) {
+      // TODO check background setting for offline, all other checks unneeded
+      return true;
+    }
     if (FinampSettingsHelper.finampSettings.isOffline) {
       return false;
     }

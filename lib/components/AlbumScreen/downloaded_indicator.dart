@@ -4,7 +4,7 @@ import 'package:flutter_tabler_icons/flutter_tabler_icons.dart';
 import 'package:get_it/get_it.dart';
 
 import '../../models/finamp_models.dart';
-import '../../services/downloads_service.dart';
+import '../../services/downloads_service/downloads_service.dart';
 import '../global_snackbar.dart';
 
 class DownloadedIndicator extends ConsumerWidget {

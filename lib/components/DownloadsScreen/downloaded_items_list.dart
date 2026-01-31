@@ -7,7 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:get_it/get_it.dart';
 
 import '../../models/finamp_models.dart';
-import '../../services/downloads_service.dart';
+import '../../services/downloads_service/downloads_service.dart';
 import '../album_image.dart';
 import 'item_file_size.dart';
 

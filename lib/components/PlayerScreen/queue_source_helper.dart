@@ -11,7 +11,7 @@ import 'package:finamp/screens/artist_screen.dart';
 import 'package:finamp/screens/downloads_screen.dart';
 import 'package:finamp/screens/genre_screen.dart';
 import 'package:finamp/screens/music_screen.dart';
-import 'package:finamp/services/downloads_service.dart';
+import 'package:finamp/services/downloads_service/downloads_service.dart';
 import 'package:finamp/services/feedback_helper.dart';
 import 'package:finamp/services/finamp_settings_helper.dart';
 import 'package:finamp/services/jellyfin_api_helper.dart';
@@ -187,6 +187,6 @@ bool queueItemInPlaylist(FinampQueueItem? queueItem) {
   }
   final baseItem = queueItem.baseItem;
   return [QueueItemSourceType.playlist, QueueItemSourceType.nextUpPlaylist].contains(queueItem.source.type) &&
-      baseItem?.playlistItemId != null &&
-      !playlistRemovalsCache.contains(queueItem.source.id + (baseItem?.playlistItemId ?? ""));
+      baseItem.playlistItemId != null &&
+      !playlistRemovalsCache.contains(queueItem.source.id + (baseItem.playlistItemId ?? ""));
 }

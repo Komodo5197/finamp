@@ -4,7 +4,7 @@ import 'package:logging/logging.dart';
 
 import '../models/finamp_models.dart';
 import '../models/jellyfin_models.dart' as jellyfin_models;
-import 'downloads_service.dart';
+import 'downloads_service/downloads_service.dart';
 import 'finamp_settings_helper.dart';
 import 'finamp_user_helper.dart';
 import 'jellyfin_api_helper.dart';

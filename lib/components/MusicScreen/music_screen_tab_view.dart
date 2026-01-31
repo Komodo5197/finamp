@@ -14,7 +14,7 @@ import 'package:scroll_to_index/scroll_to_index.dart';
 
 import '../../models/finamp_models.dart';
 import '../../models/jellyfin_models.dart';
-import '../../services/downloads_service.dart';
+import '../../services/downloads_service/downloads_service.dart';
 import '../../services/finamp_settings_helper.dart';
 import '../../services/jellyfin_api_helper.dart';
 import '../AlbumScreen/track_list_tile.dart';

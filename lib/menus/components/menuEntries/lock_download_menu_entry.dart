@@ -2,7 +2,7 @@ import 'package:finamp/components/AlbumScreen/download_dialog.dart';
 import 'package:finamp/l10n/app_localizations.dart';
 import 'package:finamp/menus/components/menuEntries/menu_entry.dart';
 import 'package:finamp/models/finamp_models.dart';
-import 'package:finamp/services/downloads_service.dart';
+import 'package:finamp/services/downloads_service/downloads_service.dart';
 import 'package:finamp/services/finamp_settings_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';

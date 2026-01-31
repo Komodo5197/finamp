@@ -3,7 +3,7 @@ import 'package:finamp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 
-import '../../services/downloads_service.dart';
+import '../../services/downloads_service/downloads_service.dart';
 import '../../services/finamp_settings_helper.dart';
 
 class DownloadLocationDeleteDialog extends StatelessWidget {

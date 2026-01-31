@@ -5,7 +5,7 @@ import 'package:finamp/components/global_snackbar.dart';
 import 'package:finamp/l10n/app_localizations.dart';
 import 'package:finamp/models/finamp_models.dart';
 import 'package:finamp/screens/downloads_location_screen.dart';
-import 'package:finamp/services/downloads_service.dart';
+import 'package:finamp/services/downloads_service/downloads_service.dart';
 import 'package:finamp/services/finamp_settings_helper.dart';
 import 'package:finamp/services/finamp_user_helper.dart';
 import 'package:flutter/material.dart';
@@ -270,7 +270,7 @@ class RedownloadTranscodesSwitch extends ConsumerWidget {
         FinampSetters.setShouldRedownloadTranscodes(value);
         if (value) {
           final isarDownloader = GetIt.instance<DownloadsService>();
-          isarDownloader.markOutdatedTranscodes();
+          await isarDownloader.markOutdatedTranscodes();
           await isarDownloader.resyncAll();
           GlobalSnackbar.message((scaffold) => AppLocalizations.of(scaffold)!.redownloadcomplete);
         }
