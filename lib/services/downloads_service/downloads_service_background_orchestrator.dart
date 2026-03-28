@@ -26,6 +26,7 @@ class DownloadsBackgroundSettings {
   DownloadLocation get internalTrackDir => downloadLocationsMap.values.firstWhere(
     (element) => element.baseDirectory == DownloadLocationType.platformDefaultDirectory,
   );
+  bool shouldRedownloadTranscodes = false;
 }
 
 class DownloadsServiceBackgroundOrchestrator implements DownloadOrchestrator {
@@ -33,17 +34,18 @@ class DownloadsServiceBackgroundOrchestrator implements DownloadOrchestrator {
   final _isar = GetIt.instance<Isar>();
   final _downloadsLogger = Logger("downloadsBackgroundService");
 
+  DownloadsServiceBackgroundOrchestrator(this._channel);
+
   // TODO real initialization
   final DownloadsBackgroundSettings settings = DownloadsBackgroundSettings();
   late final DownloadsSyncService syncBuffer = DownloadsSyncService(this);
   late final DownloadsDeleteService deleteBuffer = DownloadsDeleteService(this);
-  late final _channel = DownloadsMethodChannel();
+  final DownloadsMethodChannel _channel;
 
   // Private flags/counters used to calculate public sync/download flags
-  bool _fileSystemFull = false;
+
   int _consecutiveConnectionErrors = 0;
   bool _connectionMessageShown = false;
-  bool _userDeleteRunning = false;
 
   //
   // Flags for controlling sync/downloads
@@ -58,11 +60,15 @@ class DownloadsServiceBackgroundOrchestrator implements DownloadOrchestrator {
   /// and the sync will skip them, assuming prefer quick sync setting is true.
   bool forceFullSync = false;
 
+  bool userDeleteRunning = false;
+
+  bool fileSystemFull = false;
+
   /// Causes the downloads queue to stop processing new items
   bool get allowDownloads => allowSyncs && !syncBuffer.isRunning;
 
   /// Causes the sync queue to stop processing new items
-  bool get allowSyncs => !_fileSystemFull && _consecutiveConnectionErrors < 10 && !_userDeleteRunning;
+  bool get allowSyncs => !fileSystemFull && _consecutiveConnectionErrors < 10 && !userDeleteRunning;
 
   /// Attempts to clean up any possible issues with downloads by removing stuck downloads,
   /// deleting node links that violate the node hierarchy, running [_syncDelete] on every node
@@ -447,8 +453,8 @@ class DownloadsServiceBackgroundOrchestrator implements DownloadOrchestrator {
               // Retry items that failed from a full filesystem once the user
               // cleans it up and restarts/resyncs
               newState = DownloadItemState.enqueued;
-              if (!_fileSystemFull) {
-                _fileSystemFull = true;
+              if (!fileSystemFull) {
+                fileSystemFull = true;
                 // TODO send snackbar
                 //GlobalSnackbar.message((scaffold) => AppLocalizations.of(scaffold)!.filesystemFull);
               }
@@ -539,8 +545,7 @@ class DownloadsServiceBackgroundOrchestrator implements DownloadOrchestrator {
   }
 
   @override
-  // TODO: implement shouldRedownloadTranscodes
-  bool get shouldRedownloadTranscodes => throw UnimplementedError();
+  bool get shouldRedownloadTranscodes => settings.shouldRedownloadTranscodes;
 
   @override
   void updateDownloadStatuses({DownloadItemState? increment, DownloadItemState? decrement}) {

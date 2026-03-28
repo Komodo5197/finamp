@@ -212,6 +212,8 @@ Future<void> _setupDownloadsHelper() async {
   GetIt.instance.registerSingleton(DownloadsService());
   final downloadsService = GetIt.instance<DownloadsService>();
 
+  await downloadsService.initialize();
+
   if (!FinampSettingsHelper.finampSettings.hasCompletedDownloadsServiceMigration) {
     await downloadsService.migrateFromHive();
     FinampSetters.setHasCompletedDownloadsServiceMigration(true);

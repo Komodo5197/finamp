@@ -30,7 +30,7 @@ class DownloadsService implements DownloadOrchestrator {
   final _downloadsLogger = Logger("downloadsService");
   final _isar = GetIt.instance<Isar>();
   final _finampUserHelper = GetIt.instance<FinampUserHelper>();
-  final _channel = DownloadsMethodChannel();
+  late final _channel = DownloadsMethodChannel.foreground(this);
   late final _utils = SyncUtils(this);
   late final _downloadTaskQueue = IsarTaskQueue(_utils);
 
@@ -143,7 +143,7 @@ class DownloadsService implements DownloadOrchestrator {
   });
 
   /// Constructs the service.  startQueues should also be called to complete initialization.
-  DownloadsService() {
+  Future<void> initialize() async {
     // Initialize downloadStatuses dict with actual counts of items in isar with
     // that state.  Calls to updateItemState will keep this up to date as the
     // state of an item is changed.
@@ -168,6 +168,8 @@ class DownloadsService implements DownloadOrchestrator {
     downloadCountsStream = _downloadCountsStreamController.stream;
 
     updateDownloadCounts();
+
+    await _channel.openChannel();
 
     FileDownloader().addTaskQueue(_downloadTaskQueue);
 
@@ -211,7 +213,7 @@ class DownloadsService implements DownloadOrchestrator {
       },
     );
 
-    FileDownloader().requireWiFi(
+    await FileDownloader().requireWiFi(
       FinampSettingsHelper.finampSettings.requireWifiForDownloads ? RequireWiFi.forAllTasks : RequireWiFi.forNoTasks,
     );
 
