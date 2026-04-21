@@ -16,7 +16,10 @@ import java.io.File
 import java.io.FileNotFoundException
 import java.io.FileOutputStream
 import java.io.IOException
+import java.io.InputStream
+import java.io.OutputStream
 import java.net.URL
+
 
 class MediaItemContentProvider : ContentProvider() {
 
@@ -48,6 +51,24 @@ class MediaItemContentProvider : ContentProvider() {
                 }
             }
 
+            val inputStream = URL(fixedUri).openStream()
+            val (read, write) = ParcelFileDescriptor.createPipe()
+            val outputStream = ParcelFileDescriptor.AutoCloseOutputStream(write)
+
+            coroutineScope.launch(Dispatchers.IO) {
+                try {
+                    inputStream.use { input ->
+                        outputStream.use { output ->
+                            input.copyTo(output)
+                        }
+                    }
+                } catch (e: IOException) {
+                    Log.w(TAG, "Failure in pipe", e)
+                }
+            }
+
+            return read
+
             val response = URL(fixedUri).readBytes()
             memoryCache.put(fixedUri, response)
             return openSafePipeHelper(
@@ -61,7 +82,8 @@ class MediaItemContentProvider : ContentProvider() {
         }
 
         // this means it's a local image (downloaded or placeholder art)
-        return ParcelFileDescriptor.open(File(uri.path!!), ParcelFileDescriptor.MODE_READ_ONLY)
+        return ParcelFileDescriptor.open(File(uri.path!!), ParcelFileDescriptor.MODE_READ_ONLY)gh
+
     }
 
     override fun onCreate(): Boolean {

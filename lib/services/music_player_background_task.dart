@@ -24,6 +24,7 @@ import 'package:get_it/get_it.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_media_kit/just_audio_media_kit.dart';
 import 'package:logging/logging.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:rxdart/rxdart.dart';
 
 import 'android_auto_helper.dart';
@@ -1396,13 +1397,23 @@ class MusicPlayerBackgroundTask extends BaseAudioHandler with SeekHandler, Queue
       builtPath.addAll(["Items", mediaItem.extras!["itemJson"]["Id"] as String, "File"]);
     }
 
-    return Uri(
+    final packageInfo = await PackageInfo.fromPlatform();
+
+    final tmp = Uri(
       host: parsedBaseUrl.host,
       port: parsedBaseUrl.port,
       scheme: parsedBaseUrl.scheme,
       userInfo: parsedBaseUrl.userInfo,
       pathSegments: builtPath,
       queryParameters: queryParameters,
+    );
+    return Uri(
+      scheme: "content",
+      host: packageInfo.packageName,
+      path: tmp.path,
+      fragment: ["http", "https"].contains(tmp.scheme) ? tmp.origin : null,
+      userInfo: tmp.userInfo,
+      queryParameters: tmp.queryParameters,
     );
   }
 
