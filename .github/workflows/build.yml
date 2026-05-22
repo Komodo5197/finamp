@@ -13,11 +13,11 @@ on:
       - '*.*.*'
     branches:
       - main
-      - redesign
+      - redesign-integration-debug
 
 env:
   if_condition: &integration_if github.event_name == 'workflow_dispatch' ||
-    (github.event_name == 'push' && github.repository == 'UnicornsOnLSD/finamp' )
+    github.event_name == 'push'
 
 # Due to a flutter bug, flutter build is not generating localizations
 # workaround by always running flutter pub get immediately before building,
@@ -125,7 +125,7 @@ jobs:
           script: |
             adb logcat -c
             adb logcat &
-            flutter test integration_test/test_cases.dart -d emulator
+            timeout 13m flutter test integration_test/test_cases.dart -d emulator
 
     - name: Run Integration tests on api 25
       if: *integration_if
@@ -144,7 +144,7 @@ jobs:
           script: |
             adb logcat -c
             adb logcat &
-            flutter test integration_test/test_cases.dart -d emulator
+            timeout 13m flutter test integration_test/test_cases.dart -d emulator
 
   build-ios:
     name: Build for iOS
