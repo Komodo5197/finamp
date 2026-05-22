@@ -20,8 +20,6 @@ import 'package:integration_test/integration_test.dart';
 import 'package:just_audio_media_kit/just_audio_media_kit.dart';
 
 void main() async {
-  IntegrationTestWidgetsFlutterBinding.ensureInitialized();
-
   /// The ProviderContainer initialized by main().
   /// All tests should create and attach to descendants of this to avoid errors.
   ProviderContainer? container;
@@ -40,6 +38,8 @@ void main() async {
     unawaited(
       runZonedGuarded(
         () async {
+          IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+
           // Login testing flag redirects file accesses to testing folder and clears it on startup.
           // Download base directories are not redirected, so loginTesting flag should be avoided on mobile.
           // Note that this means mobile integration test runs will require manual file clearing outside of CI
