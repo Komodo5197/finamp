@@ -26,6 +26,8 @@ void main() async {
   List<FlutterErrorDetails>? mainErrors = [];
   bool mainCompleted = false;
 
+  IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+
   setUpAll(() async {
     // Disable audio output on windows and linux due to missing driver in CI
     if (Platform.isWindows || Platform.isLinux) {
@@ -38,8 +40,6 @@ void main() async {
     unawaited(
       runZonedGuarded(
         () async {
-          IntegrationTestWidgetsFlutterBinding.ensureInitialized();
-
           // Login testing flag redirects file accesses to testing folder and clears it on startup.
           // Download base directories are not redirected, so loginTesting flag should be avoided on mobile.
           // Note that this means mobile integration test runs will require manual file clearing outside of CI

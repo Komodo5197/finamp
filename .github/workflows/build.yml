@@ -310,7 +310,12 @@ jobs:
 
     - name: Run Integration Tests
       if: *integration_if
-      run: xvfb-run flutter test integration_test/test_cases.dart -d linux
+      run: |
+        xvfb-run flutter test integration_test/test_cases.dart -d linux
+        if [[ $? == 79 ]]; then
+          echo "Potential native crash - attempting to display"
+          timeout 2m xvfb-run flutter run -d linux
+        fi
 
     - name: Upload release archive
       if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
@@ -388,7 +393,13 @@ jobs:
 
     - name: Run Integration Tests
       if: *integration_if
-      run: flutter test integration_test/test_cases.dart -d windows
+      shell: bash
+      run: |
+        flutter test integration_test/test_cases.dart -d windows
+        if [[ $? == 79 ]]; then
+          echo "Potential native crash - attempting to display"
+          timeout 2m flutter run -d windows
+        fi
 
     - name: Prepare release archive
       if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
