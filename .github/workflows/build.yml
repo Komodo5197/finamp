@@ -310,9 +310,7 @@ jobs:
 
     - name: Run Integration Tests
       if: *integration_if
-      uses: smithki/xvfb-action@v1.1.2
-      with:
-        run: flutter test integration_test/test_cases.dart -d linux
+      run: xvfb-run flutter test integration_test/test_cases.dart -d linux
 
     - name: Upload release archive
       if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
