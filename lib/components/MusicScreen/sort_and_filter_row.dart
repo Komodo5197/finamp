@@ -90,6 +90,10 @@ extension type const ResolvedSortConfig._(SortAndFilterConfiguration config) imp
     return ResolvedSortConfig._(config.copyWith(genreFilter: genre));
   }
 
+  ResolvedSortConfig copyWithCharacterFilter(String? startCharacter) {
+    return ResolvedSortConfig._(config.copyWith(startCharacter: startCharacter));
+  }
+
   ResolvedSortConfig.skipResolving(this.config);
 
   static const defaultSort = ResolvedSortConfig._(

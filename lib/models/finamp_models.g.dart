@@ -1254,55 +1254,6 @@ class FinampHistoryItemAdapter extends TypeAdapter<FinampHistoryItem> {
           typeId == other.typeId;
 }
 
-class MediaItemIdAdapter extends TypeAdapter<MediaItemId> {
-  @override
-  final typeId = 69;
-
-  @override
-  MediaItemId read(BinaryReader reader) {
-    final numOfFields = reader.readByte();
-    final fields = <int, dynamic>{
-      for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
-    };
-    return MediaItemId(
-      contentType: fields[0] as ContentType,
-      parentType: fields[1] as MediaItemParentType,
-      itemId: fields[2] as BaseItemId?,
-      parentId: fields[3] as BaseItemId?,
-      nameFilter: fields[4] as String?,
-      pageStartIndex: (fields[5] as num?)?.toInt(),
-    );
-  }
-
-  @override
-  void write(BinaryWriter writer, MediaItemId obj) {
-    writer
-      ..writeByte(6)
-      ..writeByte(0)
-      ..write(obj.contentType)
-      ..writeByte(1)
-      ..write(obj.parentType)
-      ..writeByte(2)
-      ..write(obj.itemId)
-      ..writeByte(3)
-      ..write(obj.parentId)
-      ..writeByte(4)
-      ..write(obj.nameFilter)
-      ..writeByte(5)
-      ..write(obj.pageStartIndex);
-  }
-
-  @override
-  int get hashCode => typeId.hashCode;
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is MediaItemIdAdapter &&
-          runtimeType == other.runtimeType &&
-          typeId == other.typeId;
-}
-
 class FinampFeatureChipsConfigurationAdapter
     extends TypeAdapter<FinampFeatureChipsConfiguration> {
   @override
@@ -2629,51 +2580,6 @@ class PlaybackSpeedVisibilityAdapter
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is PlaybackSpeedVisibilityAdapter &&
-          runtimeType == other.runtimeType &&
-          typeId == other.typeId;
-}
-
-class MediaItemParentTypeAdapter extends TypeAdapter<MediaItemParentType> {
-  @override
-  final typeId = 68;
-
-  @override
-  MediaItemParentType read(BinaryReader reader) {
-    switch (reader.readByte()) {
-      case 0:
-        return MediaItemParentType.collection;
-      case 1:
-        return MediaItemParentType.rootCollection;
-      case 2:
-        return MediaItemParentType.instantMix;
-      case 3:
-        return MediaItemParentType.recentlyPlayed;
-      default:
-        return MediaItemParentType.collection;
-    }
-  }
-
-  @override
-  void write(BinaryWriter writer, MediaItemParentType obj) {
-    switch (obj) {
-      case MediaItemParentType.collection:
-        writer.writeByte(0);
-      case MediaItemParentType.rootCollection:
-        writer.writeByte(1);
-      case MediaItemParentType.instantMix:
-        writer.writeByte(2);
-      case MediaItemParentType.recentlyPlayed:
-        writer.writeByte(3);
-    }
-  }
-
-  @override
-  int get hashCode => typeId.hashCode;
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is MediaItemParentTypeAdapter &&
           runtimeType == other.runtimeType &&
           typeId == other.typeId;
 }
@@ -9572,56 +9478,34 @@ const _$FinampCollectionTypeEnumMap = {
 };
 
 MediaItemId _$MediaItemIdFromJson(Map<String, dynamic> json) => MediaItemId(
-  contentType: $enumDecode(_$ContentTypeEnumMap, json['contentType']),
-  parentType: $enumDecode(_$MediaItemParentTypeEnumMap, json['parentType']),
+  type: $enumDecode(_$MediaItemTypeEnumMap, json['type']),
   itemId: _$JsonConverterFromJson<String, BaseItemId>(
     json['itemId'],
     const BaseItemIdConverter().fromJson,
   ),
-  parentId: _$JsonConverterFromJson<String, BaseItemId>(
-    json['parentId'],
-    const BaseItemIdConverter().fromJson,
-  ),
+  tabIndex: (json['tabIndex'] as num?)?.toInt(),
   nameFilter: json['nameFilter'] as String?,
-  pageStartIndex: (json['pageStartIndex'] as num?)?.toInt(),
+  pageIndex: (json['pageIndex'] as num?)?.toInt(),
 );
 
 Map<String, dynamic> _$MediaItemIdToJson(MediaItemId instance) =>
     <String, dynamic>{
-      'contentType': _$ContentTypeEnumMap[instance.contentType]!,
-      'parentType': _$MediaItemParentTypeEnumMap[instance.parentType]!,
-      'itemId': _$JsonConverterToJson<String, BaseItemId>(
-        instance.itemId,
-        const BaseItemIdConverter().toJson,
-      ),
-      'parentId': _$JsonConverterToJson<String, BaseItemId>(
-        instance.parentId,
-        const BaseItemIdConverter().toJson,
-      ),
-      'nameFilter': instance.nameFilter,
-      'pageStartIndex': instance.pageStartIndex,
+      'type': _$MediaItemTypeEnumMap[instance.type]!,
+      if (_$JsonConverterToJson<String, BaseItemId>(
+            instance.itemId,
+            const BaseItemIdConverter().toJson,
+          )
+          case final value?)
+        'itemId': value,
+      if (instance.tabIndex case final value?) 'tabIndex': value,
+      if (instance.nameFilter case final value?) 'nameFilter': value,
+      if (instance.pageIndex case final value?) 'pageIndex': value,
     };
 
-const _$ContentTypeEnumMap = {
-  ContentType.albums: 'albums',
-  ContentType.genericArtists: 'genericArtists',
-  ContentType.playlists: 'playlists',
-  ContentType.genres: 'genres',
-  ContentType.tracks: 'tracks',
-  ContentType.home: 'home',
-  ContentType.performingArtists: 'performingArtists',
-  ContentType.albumArtists: 'albumArtists',
-  ContentType.inPlaylist: 'inPlaylist',
-  ContentType.mixed: 'mixed',
-  ContentType.inPerformingArtistAlbums: 'inPerformingArtistAlbums',
-  ContentType.inAlbumArtistAlbums: 'inAlbumArtistAlbums',
-};
-
-const _$MediaItemParentTypeEnumMap = {
-  MediaItemParentType.collection: 'collection',
-  MediaItemParentType.rootCollection: 'rootCollection',
-  MediaItemParentType.instantMix: 'instantMix',
-  MediaItemParentType.recentlyPlayed: 'recentlyPlayed',
+const _$MediaItemTypeEnumMap = {
+  MediaItemType.root: 'root',
+  MediaItemType.tab: 'tab',
+  MediaItemType.item: 'item',
 };
 
 Value? _$JsonConverterFromJson<Json, Value>(
@@ -9720,6 +9604,21 @@ Map<String, dynamic> _$TabsHomeSectionToJson(TabsHomeSection instance) =>
       'contentType': _$ContentTypeEnumMap[instance.contentType]!,
       'libraryId': const LibraryIdConverter().toJson(instance.libraryId),
     };
+
+const _$ContentTypeEnumMap = {
+  ContentType.albums: 'albums',
+  ContentType.genericArtists: 'genericArtists',
+  ContentType.playlists: 'playlists',
+  ContentType.genres: 'genres',
+  ContentType.tracks: 'tracks',
+  ContentType.home: 'home',
+  ContentType.performingArtists: 'performingArtists',
+  ContentType.albumArtists: 'albumArtists',
+  ContentType.inPlaylist: 'inPlaylist',
+  ContentType.mixed: 'mixed',
+  ContentType.inPerformingArtistAlbums: 'inPerformingArtistAlbums',
+  ContentType.inAlbumArtistAlbums: 'inAlbumArtistAlbums',
+};
 
 CollectionHomeSection _$CollectionHomeSectionFromJson(
   Map<String, dynamic> json,

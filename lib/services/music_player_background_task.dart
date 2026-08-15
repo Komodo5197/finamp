@@ -16,7 +16,6 @@ import 'package:finamp/services/playback_history_service.dart';
 import 'package:finamp/services/queue_service.dart';
 import 'package:finamp/services/radio_service_helper.dart' as RadioServiceHelper;
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:get_it/get_it.dart';
@@ -128,8 +127,6 @@ class PlayerVolumeController {
 /// can control music.
 class MusicPlayerBackgroundTask extends BaseAudioHandler with SeekHandler, QueueHandler {
   final _androidAutoHelper = GetIt.instance<AndroidAutoHelper>();
-
-  AppLocalizations? _appLocalizations;
 
   late final AudioPlayer _player;
   late final AudioPipeline _audioPipeline;
@@ -969,73 +966,6 @@ class MusicPlayerBackgroundTask extends BaseAudioHandler with SeekHandler, Queue
     }
   }
 
-  /// Returns the top-level browsable categories for use in a media browser.
-  List<MediaItem> _getRootMenu() {
-    // Choose browsing mode hints based on user settings.
-    // - flat: respect the app-wide list/grid setting for albums; category for artists
-    // - letterFirst: list for both (letter nodes render as a list)
-    final isLetterFirst =
-        FinampSettingsHelper.finampSettings.androidAutoBrowsingMode == AndroidAutoBrowsingMode.letterFirst;
-    final isGridView = FinampSettingsHelper.finampSettings.contentViewType == ContentViewType.grid;
-
-    // 1=list, 2=grid, 4=category
-    final albumsBrowsableHint = isLetterFirst
-        ? AndroidContentStyle.listItemHintValue
-        : (isGridView ? AndroidContentStyle.gridItemHintValue : AndroidContentStyle.listItemHintValue);
-    final artistsBrowsableHint = isLetterFirst
-        ? AndroidContentStyle.listItemHintValue
-        : AndroidContentStyle.categoryGridItemHintValue; // artists always category in flat mode
-
-    return [
-      MediaItem(
-        id: MediaItemId(contentType: ContentType.albums, parentType: MediaItemParentType.rootCollection).toString(),
-        // ignore: deprecated_member_use_from_same_package
-        title: _appLocalizations?.albums ?? ContentType.albums.toString(),
-        playable: false,
-        extras: {
-          AndroidContentStyle.browsableHintKey: albumsBrowsableHint,
-          AndroidContentStyle.playableHintKey: AndroidContentStyle.categoryGridItemHintValue,
-        },
-      ),
-      MediaItem(
-        id: MediaItemId(
-          contentType: ContentType.albumArtists,
-          parentType: MediaItemParentType.rootCollection,
-        ).toString(),
-        // ignore: deprecated_member_use_from_same_package
-        title: _appLocalizations?.artists ?? ContentType.albumArtists.toString(),
-        playable: false,
-        extras: {
-          AndroidContentStyle.browsableHintKey: artistsBrowsableHint,
-          AndroidContentStyle.playableHintKey: AndroidContentStyle.categoryGridItemHintValue,
-        },
-      ),
-      MediaItem(
-        id: MediaItemId(contentType: ContentType.albums, parentType: MediaItemParentType.recentlyPlayed).toString(),
-        title: _appLocalizations?.recentlyPlayedAlbums ?? 'Recently Played Albums',
-        playable: false,
-      ),
-      MediaItem(
-        id: MediaItemId(contentType: ContentType.playlists, parentType: MediaItemParentType.rootCollection).toString(),
-        // ignore: deprecated_member_use_from_same_package
-        title: _appLocalizations?.playlists ?? ContentType.playlists.toString(),
-        playable: false,
-      ),
-      MediaItem(
-        id: MediaItemId(contentType: ContentType.genres, parentType: MediaItemParentType.rootCollection).toString(),
-        // ignore: deprecated_member_use_from_same_package
-        title: _appLocalizations?.genres ?? ContentType.genres.toString(),
-        playable: false,
-      ),
-      MediaItem(
-        id: MediaItemId(contentType: ContentType.tracks, parentType: MediaItemParentType.rootCollection).toString(),
-        // ignore: deprecated_member_use_from_same_package
-        title: _appLocalizations?.tracks ?? ContentType.tracks.toString(),
-        playable: false,
-      ),
-    ];
-  }
-
   /// Implements a media browser, like used in Android Auto.
   /// Called with the ID of a non-playable (and therefore browsable) [MediaItem], and returns a list of its children.
   /// We jerry-rig the [parentMediaId] to be a JSON string that can be parsed into a [MediaItemId] object, otherwise we don't have a way to tell which item the parentMediaId refers to.
@@ -1044,22 +974,14 @@ class MusicPlayerBackgroundTask extends BaseAudioHandler with SeekHandler, Queue
   /// - [AudioService.recentRootId] is passed when the client requests the recent items (e.g. in the "For you" section of Android Auto).
   @override
   Future<List<MediaItem>> getChildren(String parentMediaId, [Map<String, dynamic>? options]) async {
-    // display root category/parent
-    if (parentMediaId == AudioService.browsableRootId) {
-      _appLocalizations ??= await AppLocalizations.delegate.load(
-        FinampSettingsHelper.finampSettings.locale ?? const Locale("en", "US"),
-      );
-
-      return _getRootMenu();
-    } else if (parentMediaId == AudioService.recentRootId) {
-      // return await _androidAutoHelper.getRecentItems();
-      // return playlists for now
-      return await _androidAutoHelper.getMediaItems(
-        MediaItemId(contentType: ContentType.playlists, parentType: MediaItemParentType.rootCollection),
-      );
+    print("GetChildren extras: $options");
+    if (parentMediaId == AudioService.recentRootId) {
+      return await _androidAutoHelper.getRecentItems();
     } else {
       try {
-        final itemId = MediaItemId.fromJson(jsonDecode(parentMediaId) as Map<String, dynamic>);
+        final itemId = parentMediaId == AudioService.browsableRootId
+            ? MediaItemId(type: MediaItemType.root)
+            : MediaItemId.fromJson(jsonDecode(parentMediaId) as Map<String, dynamic>);
 
         return await _androidAutoHelper.getMediaItems(itemId);
       } catch (e) {
@@ -1069,10 +991,43 @@ class MusicPlayerBackgroundTask extends BaseAudioHandler with SeekHandler, Queue
     }
   }
 
+  @override
+  ValueStream<Map<String, dynamic>> subscribeToChildren(String parentMediaId) {
+    if (parentMediaId == AudioService.recentRootId) {
+      return super.subscribeToChildren(parentMediaId);
+    } else {
+      // TODO is it worth adding subscriptions for anything but the roo?  maybe the tabs?
+      // I don't think we have any reasonable way to dispose of loaded items, because theres no exit callback.
+      // on the other hand, for stuff like genres we need to keep the paging alive?
+      // we could just hard fork it to use the getChildrenProvider and loadHomeSectionItemsProvider directly.
+      try {
+        final itemId = parentMediaId == AudioService.browsableRootId
+            ? MediaItemId(type: MediaItemType.root)
+            : MediaItemId.fromJson(jsonDecode(parentMediaId) as Map<String, dynamic>);
+
+        if (itemId.type == MediaItemType.tab && itemId.tabIndex == 2) {
+          return super.subscribeToChildren(parentMediaId);
+        }
+
+        final stream = BehaviorSubject.seeded(<String, dynamic>{});
+
+        GetIt.instance<ProviderContainer>().listen(_androidAutoHelper.mediaItemsProvider(itemId), (_, value) {
+          stream.add(<String, dynamic>{});
+        });
+
+        return stream;
+      } catch (e) {
+        _audioServiceBackgroundTaskLogger.severe(e);
+        return super.subscribeToChildren(parentMediaId);
+      }
+    }
+  }
+
   /// Called when a media item is requested to be played.
   /// We jerry-rig the [mediaId] to be a JSON string that can be parsed into a [MediaItemId] object, otherwise we don't have a way to tell which item the mediaId refers to.
   @override
   Future<void> playFromMediaId(String mediaId, [Map<String, dynamic>? extras]) async {
+    print("playfromMediaId extras: $extras");
     try {
       if (mediaId == QueueItemSourceNameType.shuffleAll.name) {
         return await _androidAutoHelper.shuffleAllTracks();
@@ -1090,6 +1045,7 @@ class MusicPlayerBackgroundTask extends BaseAudioHandler with SeekHandler, Queue
   /// Currently, the [extras] parameter isn't passed correctly by AudioService, so some of the metadata available during a voice search isn't available here, that's why we store the [lastSearchQuery] to use it here.
   @override
   Future<List<MediaItem>> search(String query, [Map<String, dynamic>? extras]) async {
+    print("search extras: $extras");
     _audioServiceBackgroundTaskLogger.info("search: $query ; extras: $extras");
 
     final previousItemTitle = _androidAutoHelper.lastSearchQuery?.extras?["android.intent.extra.title"] as String?;
@@ -1118,6 +1074,7 @@ class MusicPlayerBackgroundTask extends BaseAudioHandler with SeekHandler, Queue
   /// [extras] can contain additional information about the search, like the original query, a title, artist, or album (all optional and filled in by e.g. the Voice Assistant for popular items. Provided fields can indicate which type of item was requested).
   @override
   Future<void> playFromSearch(String query, [Map<String, dynamic>? extras]) async {
+    print("playformsearchn extras: $extras");
     _audioServiceBackgroundTaskLogger.info("playFromSearch: $query ; extras: $extras");
     final searchQuery = AndroidAutoSearchQuery(query, extras);
     _androidAutoHelper.setLastSearchQuery(searchQuery);

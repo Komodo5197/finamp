@@ -91,8 +91,8 @@ import 'models/theme_mode_adapter.dart';
 import 'screens/active_downloads_screen.dart';
 import 'screens/add_download_location_screen.dart';
 import 'screens/album_screen.dart';
-import 'screens/artist_screen.dart';
 import 'screens/android_auto_settings_screen.dart';
+import 'screens/artist_screen.dart';
 import 'screens/audio_service_settings_screen.dart';
 import 'screens/customization_settings_screen.dart';
 import 'screens/downloads_location_screen.dart';
@@ -997,7 +997,7 @@ class FinampApp extends ConsumerWidget {
       },
       initialRoute: SplashScreen.routeName,
       navigatorObservers: [SplitScreenNavigatorObserver(), KeepScreenOnObserver()],
-      builder: buildPlayerSplitScreenScaffold,
+      builder: (context, child) => GlobalL10nRebuilder(child: buildPlayerSplitScreenScaffold(context, child)),
       theme: ThemeData(
         brightness: Brightness.light,
         colorScheme: getColorScheme(accentColor, Brightness.light, amoledTheme),

@@ -307,6 +307,7 @@ Future<List<BaseItemDto>?> loadHomeSectionItems(
   final genreFilter = request.sortConfig.filters.firstWhereOrNull((x) => x.type == ItemFilterType.genreFilter);
   final artistFilter = request.sortConfig.filters.firstWhereOrNull((x) => x.type == ItemFilterType.artistFilter);
   final searchFilter = request.sortConfig.filters.firstWhereOrNull((x) => x.type == ItemFilterType.searchTerm);
+  final letterFilter = request.sortConfig.filters.firstWhereOrNull((x) => x.type == ItemFilterType.startsWithCharacter);
 
   final tabArtistType = switch (request.tab) {
     ContentType.albumArtists => ArtistType.albumArtist,
@@ -328,9 +329,7 @@ Future<List<BaseItemDto>?> loadHomeSectionItems(
           (filter) => switch (filter.type) {
             ItemFilterType.isFavorite => "IsFavorite",
             ItemFilterType.isFullyDownloaded => null, // only applicable for offline mode
-            // ItemFilterType.startsWithCharacter => "NameStartsWith: ${filter.value}",
-            ItemFilterType.startsWithCharacter =>
-              throw UnimplementedError(), //TODO properly handle the "NameStartsWith" filter in the API helper
+            ItemFilterType.startsWithCharacter => null,
             ItemFilterType.genreFilter => null,
             ItemFilterType.artistFilter => null,
             ItemFilterType.searchTerm => null,
@@ -346,6 +345,7 @@ Future<List<BaseItemDto>?> loadHomeSectionItems(
     //    sortAndFilterConfig.filters.any((filter) => filter.type == ItemFilterType.isFavorite))
     //     ? true
     //    : null,
+    nameStartsWith: letterFilter?.extraString,
     artistType: artistType,
     genreFilter: genreFilter?.extraBaseItem.id,
   );

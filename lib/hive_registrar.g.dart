@@ -67,8 +67,6 @@ extension HiveRegistrar on HiveInterface {
     registerAdapter(LyricsAlignmentAdapter());
     registerAdapter(LyricsFontSizeAdapter());
     registerAdapter(MediaAttachmentAdapter());
-    registerAdapter(MediaItemIdAdapter());
-    registerAdapter(MediaItemParentTypeAdapter());
     registerAdapter(MediaSourceInfoAdapter());
     registerAdapter(MediaStreamAdapter());
     registerAdapter(MediaUrlAdapter());
@@ -181,8 +179,6 @@ extension IsolatedHiveRegistrar on IsolatedHiveInterface {
     registerAdapter(LyricsAlignmentAdapter());
     registerAdapter(LyricsFontSizeAdapter());
     registerAdapter(MediaAttachmentAdapter());
-    registerAdapter(MediaItemIdAdapter());
-    registerAdapter(MediaItemParentTypeAdapter());
     registerAdapter(MediaSourceInfoAdapter());
     registerAdapter(MediaStreamAdapter());
     registerAdapter(MediaUrlAdapter());

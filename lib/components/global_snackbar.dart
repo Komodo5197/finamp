@@ -11,6 +11,7 @@ import 'package:finamp/menus/components/menu_item_info_header.dart';
 import 'package:finamp/services/feedback_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_sticky_header/flutter_sticky_header.dart';
 import 'package:http/http.dart' hide Response;
 import 'package:logging/logging.dart';
@@ -349,5 +350,25 @@ class SnackbarOptionsMenuHeader extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+StateProvider<AppLocalizations> l10nProvider = StateProvider((ref) => GlobalSnackbar.englishL10n);
+
+class GlobalL10nRebuilder extends ConsumerWidget {
+  const GlobalL10nRebuilder({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final providerL10n = ref.read(l10nProvider);
+    if (l10n != providerL10n && l10n != null) {
+      Future.microtask(() {
+        ref.read(l10nProvider.notifier).state = l10n;
+      });
+    }
+    return child;
   }
 }

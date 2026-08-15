@@ -2812,49 +2812,35 @@ class FinampCollection {
   Map<String, dynamic> toJson() => _$FinampCollectionToJson(this);
 }
 
-@HiveType(typeId: 68)
-enum MediaItemParentType {
-  @HiveField(0)
-  collection,
-  @HiveField(1)
-  rootCollection,
-  @HiveField(2)
-  instantMix,
-  @HiveField(3)
-  recentlyPlayed,
-}
+//@HiveType(typeId: 68)
+enum MediaItemType { root, tab, item }
 
 @JsonSerializable(converters: [BaseItemIdConverter()], includeIfNull: false)
-@HiveType(typeId: 69)
+//@HiveType(typeId: 69)
 class MediaItemId {
-  MediaItemId({
-    required this.contentType,
-    required this.parentType,
-    this.itemId,
-    this.parentId,
-    this.nameFilter,
-    this.pageStartIndex,
-  });
+  MediaItemId({required this.type, this.itemId, this.tabIndex, this.nameFilter, this.pageIndex});
 
-  @HiveField(0)
-  ContentType contentType;
+  MediaItemType type;
 
-  @HiveField(1)
-  MediaItemParentType parentType;
-
-  @HiveField(2)
   BaseItemId? itemId;
 
-  @HiveField(3)
-  BaseItemId? parentId;
+  int? tabIndex;
 
   /// Letter prefix for Android Auto letter-based browsing (e.g. "A", "B", "#").
-  @HiveField(4)
   String? nameFilter;
 
   /// Page offset for Android Auto letter-based browsing pagination.
-  @HiveField(5)
-  int? pageStartIndex;
+  int? pageIndex;
+
+  MediaItemId copyWith({String? nameFilter}) {
+    return MediaItemId(
+      type: type,
+      itemId: itemId,
+      tabIndex: tabIndex,
+      nameFilter: nameFilter ?? this.nameFilter,
+      pageIndex: pageIndex,
+    );
+  }
 
   factory MediaItemId.fromJson(Map<String, dynamic> json) => _$MediaItemIdFromJson(json);
 
@@ -4651,6 +4637,7 @@ class SortAndFilterConfiguration {
     bool? favoriteFilter,
     bool? onlyShowFullyDownloadedFilter,
     String? searchQuery,
+    String? startCharacter,
   }) {
     final processedFilters = filters ?? this.filters.toSet();
     if (genreFilter != null) {
@@ -4676,6 +4663,10 @@ class SortAndFilterConfiguration {
     if (searchQuery != null) {
       processedFilters.removeWhere((x) => x.type == ItemFilterType.searchTerm);
       processedFilters.add(ItemFilter(type: ItemFilterType.searchTerm, extras: searchQuery));
+    }
+    if (startCharacter != null) {
+      processedFilters.removeWhere((x) => x.type == ItemFilterType.startsWithCharacter);
+      processedFilters.add(ItemFilter(type: ItemFilterType.startsWithCharacter, extras: startCharacter));
     }
     return SortAndFilterConfiguration(
       sortBy: sortBy ?? this.sortBy,

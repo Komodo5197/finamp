@@ -1435,24 +1435,18 @@ class QueueService {
   Future<MediaItem> generateMediaItem(
     jellyfin_models.BaseItemDto item, {
     double? contextNormalizationGain,
-    MediaItemParentType? parentType,
-    jellyfin_models.BaseItemId? parentId,
+    MediaItemType? itemType,
     bool Function({jellyfin_models.BaseItemDto? item, ContentType? contentType})? isPlayable,
   }) async {
     const uuid = Uuid();
 
     MediaItemId? itemId;
-    final tabContentType = ContentType.fromItemType(item.type ?? "Audio");
     bool isAndroidAutoOrMediaBrowserRequest = false;
 
-    if (parentType != null) {
+    if (itemType != null) {
+      assert(itemType == MediaItemType.item);
       isAndroidAutoOrMediaBrowserRequest = true;
-      itemId = MediaItemId(
-        contentType: tabContentType,
-        parentType: parentType,
-        parentId: parentId ?? item.parentId,
-        itemId: item.id,
-      );
+      itemId = MediaItemId(type: MediaItemType.item, itemId: item.id);
     }
 
     bool isDownloaded = false;

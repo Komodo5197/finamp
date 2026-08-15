@@ -1,12 +1,17 @@
 import 'package:audio_service/audio_service.dart';
 import 'package:collection/collection.dart';
+import 'package:finamp/components/MusicScreen/sort_and_filter_row.dart';
 import 'package:finamp/components/global_snackbar.dart';
 import 'package:finamp/models/finamp_models.dart';
 import 'package:finamp/models/jellyfin_models.dart';
 import 'package:finamp/services/downloads_service.dart';
+import 'package:finamp/services/item_by_id_provider.dart';
+import 'package:finamp/services/music_providers.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:get_it/get_it.dart';
 import 'package:logging/logging.dart';
 
+import '../models/music_models.dart';
 import 'audio_service_helper.dart';
 import 'finamp_settings_helper.dart';
 import 'finamp_user_helper.dart';
@@ -21,12 +26,45 @@ class AndroidAutoSearchQuery {
   AndroidAutoSearchQuery(this.rawQuery, this.extras);
 }
 
+// Planned structure
+// strip down mediaitems used outside of queue.
+// make media id just have item id, page state (list/grid/paged offset/letter grid/filtered letter) - might need parent context?  track playback needs it.
+//   - maybe can avoid track playback if we disable album browse?  but might need anyway for item type home sections or performing artist browsing.
+//   - maybe we just use appears on albums for performingArtist, but use tracks for play/shuffle.
+// add getChildren provider - convert media id to playable, then get children, then convert to mediaitems + add extras.
+// provider can be read/listened to by getChildren+subscribe.  Playback easy with playable conversion.
+// play from search still needs to be seperated from regular due to slightly different logic
+// tabs will be home sections with new type tracking that follows main app tab sorting.
+// don't include full info in media id - just have a tab index and look it up in the backend.
+
+// can have choice to play, shuffle browse list, or brose grid for all collection contentTypes.  Too much?
+// - we'd need to handle tracks vs albums for artists - should we just have album vs performing split?
+// - would people want tabs handled differently than in-artist?  Is tracking main screen still cleaner?
+// - maybe do this later, and just use browse artist + currents?  How to handle artists with just tracks?
+// - does none search screens support group hints?  that could be nice.
+
+// Implementation
+// step 0 - move search code into independant class?  add os_integration folder?
+// first, build the provider.  Use existing media ids, just use playables for item children fetching
+// Then expand it to do page fetching for the current tab types - hardwire playable lookups.
+// add subscription function, verify changing the setting causes tab reload.
+// clean up media item id for minimum info.  Reduce browsing mediaItems & consider increasing page size?
+// add const home section list to convert tab fetches from - new tracking type + allow browsing style choice?  Or just track.
+//    - this is the first real UX question step.  per-tab list vs grid vs letter?  allow grid under letters?
+// Add real UI for editing tabs.  Only allow tracking + tab?  Should tracking be an option on all tab sections?
+// Consider adding item sections - would need to get album browsing working.
+// consider adding browsing style selectors for all contentTypes?
+
 class AndroidAutoHelper {
   static final _androidAutoHelperLogger = Logger("AndroidAutoHelper");
 
   final _finampUserHelper = GetIt.instance<FinampUserHelper>();
   final _jellyfinApiHelper = GetIt.instance<JellyfinApiHelper>();
   final _downloadsService = GetIt.instance<DownloadsService>();
+  final _container = GetIt.instance<ProviderContainer>();
+  // This cannot be set up on first load, but should be available before we try to actually load anything
+  // TODO investigate better ordering?
+  late final _queueService = GetIt.instance<QueueService>();
 
   /// Maximum items returned per Android Auto browse page.
   /// Kept well under the ~1MB Binder IPC limit.
@@ -40,20 +78,6 @@ class AndroidAutoHelper {
   }
 
   AndroidAutoSearchQuery? get lastSearchQuery => _lastSearchQuery;
-
-  Future<BaseItemDto?> getParentFromId(BaseItemId parentId) async {
-    final downloadedParent = await _downloadsService.getCollectionInfo(id: parentId);
-    if (downloadedParent != null) {
-      return downloadedParent.baseItem;
-    } else if (FinampSettingsHelper.finampSettings.isOffline) {
-      return null;
-    }
-
-    return await _jellyfinApiHelper.getItemById(parentId);
-  }
-
-  /// Sentinel nameFilter value used to identify the "Browse by Letter" index node.
-  static const String _letterRootNameFilter = 'letter_root';
 
   /// Letters used for the "Browse by Letter" nodes.
   static const List<String> _alphabet = [
@@ -90,12 +114,7 @@ class AndroidAutoHelper {
   List<MediaItem> _getLetterNodes(MediaItemId itemId) {
     return _alphabet.map((letter) {
       return MediaItem(
-        id: MediaItemId(
-          contentType: itemId.contentType,
-          parentType: MediaItemParentType.rootCollection,
-          nameFilter: letter,
-          pageStartIndex: 0,
-        ).toString(),
+        id: itemId.copyWith(nameFilter: letter).toString(),
         title: letter,
         playable: false,
         extras: const {
@@ -105,64 +124,6 @@ class AndroidAutoHelper {
         },
       );
     }).toList();
-  }
-
-  /// Fetches a single page of [_pageSize] items filtered by [nameFilter]
-  /// (a single letter, or '#' for non-alphabetic names), for letter browsing.
-  Future<(List<BaseItemDto>, int)> _fetchLetterPage(MediaItemId itemId) async {
-    final sortBy = FinampSettingsHelper.finampSettings.getTabSortBy(itemId.contentType);
-    final sortOrder = FinampSettingsHelper.finampSettings.getSortOrder(itemId.contentType);
-    final pageStart = itemId.pageStartIndex ?? 0;
-    final nameFilter = itemId.nameFilter!;
-
-    if (FinampSettingsHelper.finampSettings.isOffline) {
-      const offlineModeLimit = 1000;
-      final List<BaseItemDto> allItems = [];
-      for (final downloadedParent in await _downloadsService.getAllCollections()) {
-        if (allItems.length >= offlineModeLimit) break;
-        if (downloadedParent.baseItem != null && downloadedParent.baseItemType == itemId.contentType.itemType) {
-          final name = downloadedParent.baseItem?.name ?? '';
-          final firstChar = name.isNotEmpty ? name[0].toUpperCase() : '';
-          final matches = nameFilter == '#' ? !RegExp(r'[A-Za-z]').hasMatch(firstChar) : firstChar == nameFilter;
-          if (matches) allItems.add(downloadedParent.baseItem!);
-        }
-      }
-      final sorted = sortItems(allItems, sortBy, sortOrder);
-      final page = sorted.skip(pageStart).take(_pageSize).toList();
-      return (page, sorted.length);
-    }
-
-    final parentItem = itemId.contentType == ContentType.playlists ? null : _finampUserHelper.currentUser?.currentView;
-
-    // Jellyfin's NameStartsWith doesn't support '#'; for that bucket we fetch
-    // a large page without a name filter and discard alphabetic starters client-side.
-    if (nameFilter == '#') {
-      final result = await _jellyfinApiHelper.getItemsWithTotalRecordCount(
-        parentItem: parentItem,
-        sortBy: sortBy.jellyfinName(itemId.contentType),
-        sortOrder: sortOrder.toString(),
-        includeItemTypes: itemId.contentType.itemType!.jellyfinName,
-        startIndex: pageStart,
-        limit: 500,
-      );
-      final all = (result.items ?? []).where((i) {
-        final fc = (i.name?.isNotEmpty ?? false) ? i.name![0].toUpperCase() : '';
-        return !RegExp(r'[A-Za-z]').hasMatch(fc);
-      }).toList();
-      final page = all.take(_pageSize).toList();
-      return (page, all.length);
-    }
-
-    final result = await _jellyfinApiHelper.getItemsWithTotalRecordCount(
-      parentItem: parentItem,
-      sortBy: sortBy.jellyfinName(itemId.contentType),
-      sortOrder: sortOrder.toString(),
-      includeItemTypes: itemId.contentType.itemType!.jellyfinName,
-      startIndex: pageStart,
-      limit: _pageSize,
-      nameStartsWith: nameFilter,
-    );
-    return (result.items ?? [], result.totalRecordCount);
   }
 
   /// Returns up to 20 recently played albums (online only).
@@ -226,8 +187,7 @@ class AndroidAutoHelper {
       for (final item in sortedItems) {
         final mediaItem = await queueService.generateMediaItem(
           item,
-          parentType: MediaItemParentType.collection,
-          parentId: item.parentId,
+          itemType: MediaItemType.item,
           isPlayable: _isPlayable,
         );
         mediaItems.add(mediaItem);
@@ -239,163 +199,6 @@ class AndroidAutoHelper {
     }
   }
 
-  /// Fetches a single page of [_pageSize] items for a root collection browse,
-  /// returning the items and the server's total record count for pagination.
-  Future<(List<BaseItemDto>, int)> _fetchRootPage(MediaItemId itemId) async {
-    final sortBy = FinampSettingsHelper.finampSettings.getTabSortBy(itemId.contentType);
-    final sortOrder = FinampSettingsHelper.finampSettings.getSortOrder(itemId.contentType);
-    final pageStart = itemId.pageStartIndex ?? 0;
-
-    if (FinampSettingsHelper.finampSettings.isOffline) {
-      const offlineModeLimit = 1000;
-      final List<BaseItemDto> allItems = [];
-      for (final downloadedParent in await _downloadsService.getAllCollections()) {
-        if (allItems.length >= offlineModeLimit) break;
-        if (downloadedParent.baseItem != null && downloadedParent.baseItemType == itemId.contentType.itemType) {
-          allItems.add(downloadedParent.baseItem!);
-        }
-      }
-      final sorted = sortItems(allItems, sortBy, sortOrder);
-      final page = sorted.skip(pageStart).take(_pageSize).toList();
-      return (page, sorted.length);
-    }
-
-    final parentItem = itemId.contentType == ContentType.playlists ? null : _finampUserHelper.currentUser?.currentView;
-
-    final result = await _jellyfinApiHelper.getItemsWithTotalRecordCount(
-      parentItem: parentItem,
-      sortBy: sortBy.jellyfinName(itemId.contentType),
-      sortOrder: sortOrder.toString(),
-      includeItemTypes: itemId.contentType.itemType!.jellyfinName,
-      startIndex: pageStart,
-      limit: _pageSize,
-      artistType: itemId.contentType == ContentType.albumArtists ? ArtistType.albumArtist : null,
-    );
-    return (result.items ?? [], result.totalRecordCount);
-  }
-
-  Future<List<BaseItemDto>> getBaseItems(MediaItemId itemId) async {
-    // Number of items fetched per page when paginating online results.
-    // Kept small enough to be fast but large enough to minimise round-trips.
-    const fetchPageSize = 500;
-    const offlineModeLimit = 1000;
-
-    final sortBy = FinampSettingsHelper.finampSettings.getTabSortBy(itemId.contentType);
-    final sortOrder = FinampSettingsHelper.finampSettings.getSortOrder(itemId.contentType);
-
-    // if we are in offline mode and in root parent/collection, display all matching downloaded parents
-    if (FinampSettingsHelper.finampSettings.isOffline && itemId.parentType == MediaItemParentType.rootCollection) {
-      List<BaseItemDto> baseItems = [];
-      for (final downloadedParent in await _downloadsService.getAllCollections()) {
-        if (baseItems.length >= offlineModeLimit) break;
-        if (downloadedParent.baseItem != null && downloadedParent.baseItemType == itemId.contentType.itemType) {
-          baseItems.add(downloadedParent.baseItem!);
-        }
-      }
-      return sortItems(baseItems, sortBy, sortOrder);
-    }
-
-    // use downloaded parent only in offline mode
-    // otherwise we only play downloaded tracks from albums/collections, not all of them
-    // downloaded tracks will be played from device when resolving them to media items
-    if (FinampSettingsHelper.finampSettings.isOffline && itemId.parentType == MediaItemParentType.collection) {
-      if (itemId.contentType == ContentType.genres) {
-        final genreBaseItem = await getParentFromId(itemId.itemId!);
-
-        final List<BaseItemDto> genreAlbums = (await _downloadsService.getAllCollections(
-          includeItemTypes: [BaseItemDtoType.album],
-          relatedTo: genreBaseItem,
-        )).toList().map((e) => e.baseItem).whereNotNull().toList();
-        genreAlbums.sort((a, b) => (a.premiereDate ?? "").compareTo(b.premiereDate ?? ""));
-        return genreAlbums;
-      } else if (itemId.contentType.isArtist) {
-        final artistBaseItem = await getParentFromId(itemId.itemId!);
-
-        final List<BaseItemDto> artistAlbums = (await _downloadsService.getAllCollections(
-          includeItemTypes: [BaseItemDtoType.album],
-          relatedTo: artistBaseItem,
-        )).toList().map((e) => e.baseItem).whereNotNull().toList();
-        artistAlbums.sort((a, b) => (a.premiereDate ?? "").compareTo(b.premiereDate ?? ""));
-
-        return artistAlbums;
-      } else {
-        var downloadedParent = await _downloadsService.getCollectionInfo(id: itemId.itemId);
-        if (downloadedParent != null && downloadedParent.baseItem != null) {
-          final downloadedItems = await _downloadsService.getCollectionTracks(downloadedParent.baseItem!);
-          if (downloadedItems.length >= offlineModeLimit) {
-            downloadedItems.removeRange(offlineModeLimit, downloadedItems.length - 1);
-          }
-
-          // only sort items if we are not playing them
-          return _isPlayable(contentType: itemId.contentType)
-              ? downloadedItems
-              : sortItems(downloadedItems, sortBy, sortOrder);
-        }
-      }
-    }
-
-    // fetch the online version if we can't get offline version
-
-    // select the item type that each parent holds
-    BaseItemDtoType includeItemTypes;
-    if (itemId.parentType == MediaItemParentType.collection) {
-      // if we are browsing a root library. e.g. browsing the list of all albums or artists
-      switch (itemId.contentType) {
-        case ContentType.albums:
-          // get an album's tracks
-          includeItemTypes = ContentType.tracks.itemType!;
-          break;
-        case ContentType.genericArtists:
-        case ContentType.albumArtists:
-        case ContentType.performingArtists:
-          // get an artist's albums
-          includeItemTypes = ContentType.albums.itemType!;
-          break;
-        case ContentType.playlists:
-          // get a playlist's tracks
-          includeItemTypes = ContentType.tracks.itemType!;
-          break;
-        case ContentType.genres:
-          // get a genre's albums
-          includeItemTypes = ContentType.albums.itemType!;
-          break;
-        default:
-          // if we don't have one of these categories, we are probably dealing with stray tracks
-          includeItemTypes = ContentType.tracks.itemType!;
-          break;
-      }
-    } else {
-      // get the root library
-      includeItemTypes = itemId.contentType.itemType!;
-    }
-
-    // if parent id is defined, use that to get items.
-    // otherwise, use the current view as fallback to ensure we get the correct items.
-    final parentItem = itemId.parentType == MediaItemParentType.collection
-        ? BaseItemDto(id: itemId.itemId!, type: itemId.contentType.itemType?.jellyfinName)
-        : (itemId.contentType == ContentType.playlists ? null : _finampUserHelper.currentUser?.currentView);
-
-    final List<BaseItemDto> allItems = [];
-    int startIndex = 0;
-    while (true) {
-      final result = await _jellyfinApiHelper.getItemsWithTotalRecordCount(
-        parentItem: parentItem,
-        sortBy: includeItemTypes == BaseItemDtoType.track
-            ? "ParentIndexNumber,IndexNumber,${sortBy.jellyfinName(itemId.contentType)}"
-            : sortBy.jellyfinName(itemId.contentType),
-        sortOrder: includeItemTypes == BaseItemDtoType.track ? null : sortOrder.toString(),
-        includeItemTypes: includeItemTypes.jellyfinName,
-        startIndex: startIndex,
-        limit: fetchPageSize,
-      );
-      final page = result.items ?? [];
-      allItems.addAll(page);
-      if (allItems.length >= result.totalRecordCount || page.isEmpty) break;
-      startIndex += page.length;
-    }
-    return allItems;
-  }
-
   Future<List<MediaItem>> getRecentItems() async {
     final queueService = GetIt.instance<QueueService>();
     //TODO this should ideally list recent queues (the restorable ones), or items from the home screen
@@ -405,7 +208,7 @@ class AndroidAutoHelper {
       for (final item in recentItems) {
         final mediaItem = await queueService.generateMediaItem(
           item.baseItem,
-          parentType: MediaItemParentType.collection,
+          itemType: MediaItemType.item,
           isPlayable: _isPlayable,
         );
         recentMediaItems.add(mediaItem);
@@ -415,6 +218,366 @@ class AndroidAutoHelper {
       _androidAutoHelperLogger.severe("Error while getting recent items:", err);
       return [];
     }
+  }
+
+  Future<void> shuffleAllTracks() async {
+    final audioServiceHelper = GetIt.instance<AudioServiceHelper>();
+
+    try {
+      await audioServiceHelper.shuffleAll(onlyShowFavorites: FinampSettingsHelper.finampSettings.onlyShowFavorites);
+    } catch (err) {
+      _androidAutoHelperLogger.severe("Error while shuffling all tracks", err);
+    }
+  }
+
+  // TODO merge the logic between browsing and playing better - more playables?
+  late FutureProviderFamily<FinampPlayable, MediaItemId> mediaPlayableProvider = FutureProvider.family((
+    ref,
+    mediaId,
+  ) async {
+    switch (mediaId.type) {
+      case MediaItemType.root:
+        throw UnsupportedError("Cant play the home screen");
+      case MediaItemType.tab:
+        final content = [
+          ContentType.albums,
+          ContentType.albumArtists,
+          ContentType.albums,
+          ContentType.playlists,
+          ContentType.genres,
+          ContentType.tracks,
+        ][mediaId.tabIndex!];
+        final sortControl = SortAndFilterController.trackSettings(content);
+        return MusicScreenPlayable(
+          tab: content,
+          library: currentLibraryPlaceholder,
+          source: QueueItemSource.rawId(
+            type: QueueItemSourceType.allTracks,
+            // TODO fix source
+            name: QueueItemSourceName(type: QueueItemSourceNameType.preTranslated, pretranslatedName: "AA"),
+            id: "AA",
+          ),
+          sortConfig: ref.watch(resolveSortProvider(sortControl)).copyWithCharacterFilter(mediaId.nameFilter),
+        );
+      case MediaItemType.item:
+        final item = await ref.watch(itemByIdProvider(mediaId.itemId!).future);
+        if (item == null) {
+          // TODO fix this - rename unavailible offline? Just throw error?
+          throw UnimplementedError();
+        }
+        return FinampPlayableDto.fromItem(item);
+    }
+  });
+
+  late FutureProviderFamily<List<MediaItem>, MediaItemId> mediaItemsProvider = FutureProvider.family((
+    ref,
+    mediaId,
+  ) async {
+    print("ZZZZZZZZZZ Getting child of $mediaId");
+    switch (mediaId.type) {
+      case MediaItemType.root:
+        return _getRootMenu(ref);
+      case MediaItemType.tab:
+        final content = [
+          ContentType.albums,
+          ContentType.albumArtists,
+          ContentType.albums,
+          ContentType.playlists,
+          ContentType.genres,
+          ContentType.tracks,
+        ][mediaId.tabIndex!];
+        final supportsLetterBrowse = [
+          ContentType.albums,
+          ContentType.albumArtists,
+          ContentType.genres,
+        ].contains(content);
+        if (supportsLetterBrowse &&
+            ref.watch(finampSettingsProvider.androidAutoBrowsingMode) == AndroidAutoBrowsingMode.letterFirst &&
+            mediaId.nameFilter == null) {
+          return _getLetterNodes(mediaId);
+        }
+        final sortControl = SortAndFilterController.trackSettings(content);
+        final playable = MusicScreenPlayable(
+          tab: content,
+          library: currentLibraryPlaceholder,
+          source: QueueItemSource.rawId(
+            type: QueueItemSourceType.allTracks,
+            // TODO fix source
+            name: QueueItemSourceName(type: QueueItemSourceNameType.preTranslated, pretranslatedName: "AA"),
+            id: "AA",
+          ),
+          sortConfig: ref.watch(resolveSortProvider(sortControl)).copyWithCharacterFilter(mediaId.nameFilter),
+        );
+        return await _mediaItemsFromPlayable(ref, playable);
+      case MediaItemType.item:
+        final item = await ref.watch(itemByIdProvider(mediaId.itemId!).future);
+        if (item == null) {
+          return [];
+        }
+        final playable = FinampPlayableDto.fromItem(item);
+        return await _mediaItemsFromPlayable(ref, playable);
+    }
+  });
+
+  /// Returns the top-level browsable categories for use in a media browser.
+  List<MediaItem> _getRootMenu(Ref ref) {
+    final l10n = ref.watch(l10nProvider);
+
+    // Choose browsing mode hints based on user settings.
+    // - flat: respect the app-wide list/grid setting for albums; category for artists
+    // - letterFirst: list for both (letter nodes render as a list)
+    final isLetterFirst =
+        FinampSettingsHelper.finampSettings.androidAutoBrowsingMode == AndroidAutoBrowsingMode.letterFirst;
+    final isGridView = FinampSettingsHelper.finampSettings.contentViewType == ContentViewType.grid;
+
+    // 1=list, 2=grid, 4=category
+    final albumsBrowsableHint = isLetterFirst
+        ? AndroidContentStyle.listItemHintValue
+        : (isGridView ? AndroidContentStyle.gridItemHintValue : AndroidContentStyle.listItemHintValue);
+    final artistsBrowsableHint = isLetterFirst
+        ? AndroidContentStyle.listItemHintValue
+        : AndroidContentStyle.categoryGridItemHintValue; // artists always category in flat mode
+
+    return [
+      MediaItem(
+        id: MediaItemId(type: MediaItemType.tab, tabIndex: 0).toString(),
+        title: l10n.albums,
+        playable: false,
+        extras: {
+          AndroidContentStyle.browsableHintKey: albumsBrowsableHint,
+          AndroidContentStyle.playableHintKey: AndroidContentStyle.categoryGridItemHintValue,
+        },
+      ),
+      MediaItem(
+        id: MediaItemId(type: MediaItemType.tab, tabIndex: 1).toString(),
+        title: l10n.artists,
+        playable: false,
+        extras: {
+          AndroidContentStyle.browsableHintKey: artistsBrowsableHint,
+          AndroidContentStyle.playableHintKey: AndroidContentStyle.categoryGridItemHintValue,
+        },
+      ),
+      MediaItem(
+        id: MediaItemId(type: MediaItemType.tab, tabIndex: 2).toString(),
+        title: l10n.recentlyPlayedAlbums,
+        playable: false,
+      ),
+      MediaItem(
+        id: MediaItemId(type: MediaItemType.tab, tabIndex: 3).toString(),
+        title: l10n.playlists,
+        playable: false,
+      ),
+      MediaItem(
+        id: MediaItemId(type: MediaItemType.tab, tabIndex: 4).toString(),
+        title: l10n.genres,
+        playable: false,
+      ),
+      MediaItem(
+        id: MediaItemId(type: MediaItemType.tab, tabIndex: 5).toString(),
+        title: l10n.tracks,
+        playable: false,
+      ),
+    ];
+  }
+
+  Future<List<MediaItem>> _mediaItemsFromPlayable(Ref ref, FinampDisplayableOrPlayable playable) async {
+    final List<MediaItem> mediaItems = [];
+    switch (playable) {
+      case FinampUnpagedDisplayable<FinampPlayableDto>():
+        final items = await ref.watch(getChildItemsProvider(item: playable).future);
+        for (final item in items) {
+          final mediaItem = await _queueService.generateMediaItem(
+            item.item,
+            itemType: MediaItemType.item,
+            isPlayable: _isPlayable,
+          );
+          mediaItems.add(mediaItem);
+        }
+        return mediaItems;
+      case FinampPagedPlayable<FinampPlayableDto>():
+        // TODO reimplement paging
+        final tup = ref.watch(pagedContentProvider(playable).notifier).loadSlice(0, 100);
+        final items = (tup.$1 + (await tup.$2 ?? [])).cast<FinampPlayableDto>();
+        for (final item in items) {
+          final mediaItem = await _queueService.generateMediaItem(
+            item.item,
+            itemType: MediaItemType.item,
+            isPlayable: _isPlayable,
+          );
+          mediaItems.add(mediaItem);
+        }
+        return mediaItems;
+      case UnavailableHomeSectionPlayable():
+        throw UnimplementedError();
+      case PlayableQueue():
+      case LatestQueues():
+      case Track():
+      case InstantMix():
+        throw UnimplementedError();
+    }
+  }
+
+  Future<List<MediaItem>> getMediaItems(MediaItemId itemId) async {
+    if (itemId.type == MediaItemType.tab && itemId.tabIndex == 2) {
+      return _getRecentlyPlayedItems(itemId);
+    }
+
+    return await _container.read(mediaItemsProvider(itemId).future);
+
+    /*final items = await _container.read(getChildrenProvider(item: playable).future);
+
+    // Root collections are paginated to stay within the Android Auto Binder
+    // IPC limit (~1MB). Each page shows _pageSize items with a "More..." node
+    // appended when further pages exist.
+    if (itemId.parentType == MediaItemParentType.rootCollection) {
+      final nameFilter = itemId.nameFilter;
+
+      // --- Browse-by-Letter index: return A–Z + # nodes ---
+      if (nameFilter == _letterRootNameFilter) {
+        return _getLetterNodes(itemId);
+      }
+
+      // --- Letter page: items starting with nameFilter ---
+      if (nameFilter != null) {
+        final (items, totalCount) = await _fetchLetterPage(itemId);
+        final pageStart = itemId.pageStartIndex ?? 0;
+
+        for (final item in items) {
+          final mediaItem = await queueService.generateMediaItem(
+            item,
+            itemType: MediaItemType.item,
+            parentId: item.parentId,
+            isPlayable: _isPlayable,
+          );
+          mediaItems.add(mediaItem);
+        }
+
+        if (pageStart + items.length < totalCount) {
+          final nextStart = pageStart + _pageSize;
+          final remaining = totalCount - nextStart;
+          mediaItems.add(
+            MediaItem(
+              id: MediaItemId(
+                contentType: itemId.contentType,
+                parentType: MediaItemParentType.rootCollection,
+                nameFilter: nameFilter,
+                pageStartIndex: nextStart,
+              ).toString(),
+              title: GlobalSnackbar.requireL10n.androidAutoMoreItems(remaining),
+              playable: false,
+            ),
+          );
+        }
+
+        return mediaItems;
+      }
+
+      // --- Flat paginated list (nameFilter == null) ---
+      if (itemId.contentType == ContentType.tracks) {
+        mediaItems.add(
+          MediaItem(
+            id: QueueItemSourceNameType.shuffleAll.name,
+            title: GlobalSnackbar.requireL10n.shuffleAll,
+            playable: true,
+          ),
+        );
+      }
+
+      if (itemId.contentType == ContentType.albumArtists &&
+          itemId.parentType == MediaItemParentType.collection &&
+          itemId.itemId != null) {
+        final instantMixId = MediaItemId(
+          contentType: ContentType.albumArtists,
+          parentType: MediaItemParentType.instantMix,
+          itemId: itemId.itemId,
+        );
+        mediaItems.add(
+          MediaItem(id: instantMixId.toString(), title: GlobalSnackbar.requireL10n.instantMix, playable: true),
+        );
+      }
+
+      // Albums, Artists, and Tracks support letter browsing.
+      // If letterFirst, return the A–Z index immediately; otherwise fall through to flat list.
+      final supportsLetterBrowse =
+          itemId.contentType == ContentType.albums ||
+          itemId.contentType == ContentType.albumArtists ||
+          itemId.contentType == ContentType.tracks;
+      final isLetterFirst =
+          FinampSettingsHelper.finampSettings.androidAutoBrowsingMode == AndroidAutoBrowsingMode.letterFirst;
+      if (supportsLetterBrowse && isLetterFirst) {
+        return _getLetterNodes(itemId);
+      }
+
+      // For flat list mode: "Browse by Letter" node only on first page, if supported.
+      final pageStart = itemId.pageStartIndex ?? 0;
+      if (pageStart == 0 && supportsLetterBrowse && !isLetterFirst) {
+        mediaItems.add(
+          MediaItem(
+            id: MediaItemId(
+              contentType: itemId.contentType,
+              parentType: MediaItemParentType.rootCollection,
+              nameFilter: _letterRootNameFilter,
+            ).toString(),
+            title: GlobalSnackbar.requireL10n.androidAutoBrowseByLetter,
+            playable: false,
+          ),
+        );
+      }
+
+      final (items, totalCount) = await _fetchRootPage(itemId);
+
+      for (final item in items) {
+        final mediaItem = await queueService.generateMediaItem(
+          item,
+          itemType: MediaItemType.item,
+          parentId: item.parentId,
+          isPlayable: _isPlayable,
+        );
+        mediaItems.add(mediaItem);
+      }
+
+      // Guard against Jellyfin returning a slightly inflated totalRecordCount
+      // (observed with playlists), which would produce a negative remaining count.
+      if (pageStart + items.length < totalCount) {
+        final nextStart = pageStart + _pageSize;
+        final remaining = totalCount - nextStart;
+        if (remaining > 0) {
+          mediaItems.add(
+            MediaItem(
+              id: MediaItemId(
+                contentType: itemId.contentType,
+                parentType: MediaItemParentType.rootCollection,
+                pageStartIndex: nextStart,
+              ).toString(),
+              title: GlobalSnackbar.requireL10n.androidAutoMoreItems(remaining),
+              playable: false,
+            ),
+          );
+        }
+      }
+
+      return mediaItems;
+    }
+
+    final items = await getBaseItems(itemId);
+
+    for (final item in items) {
+      final mediaItem = await queueService.generateMediaItem(
+        item,
+        itemType: MediaItemType.item,
+        parentId: item.parentId,
+        isPlayable: _isPlayable,
+      );
+      mediaItems.add(mediaItem);
+    }
+    return mediaItems;*/
+  }
+
+  Future<void> playFromMediaId(MediaItemId itemId) async {
+    final playable = await _container.read(mediaPlayableProvider(itemId).future);
+    // TODO handle more complicated track work somewhere?  Better error handling for unplayable id?
+    final slice = await _container.read(getPlayableSliceProvider(item: playable, startingOffset: 0).future);
+    return _queueService.startSlicePlayback(slice);
   }
 
   Future<List<MediaItem>> searchItems(AndroidAutoSearchQuery searchQuery) async {
@@ -443,8 +606,7 @@ class AndroidAutoHelper {
       for (final item in allSearchResults) {
         final mediaItem = await queueService.generateMediaItem(
           item,
-          parentType: MediaItemParentType.collection,
-          parentId: item.parentId,
+          itemType: MediaItemType.item,
           isPlayable: _isPlayable,
         );
 
@@ -485,8 +647,6 @@ class AndroidAutoHelper {
   Future<void> playFromSearch(AndroidAutoSearchQuery searchQuery) async {
     final jellyfinApiHelper = GetIt.instance<JellyfinApiHelper>();
     final finampUserHelper = GetIt.instance<FinampUserHelper>();
-    final audioServiceHelper = GetIt.instance<AudioServiceHelper>();
-    final queueService = GetIt.instance<QueueService>();
 
     if (searchQuery.rawQuery.isEmpty) {
       return await shuffleAllTracks();
@@ -572,7 +732,7 @@ class AndroidAutoHelper {
 
           _androidAutoHelperLogger.info("Playing playlist: ${playlist.name} (${items?.length} tracks)");
 
-          await queueService.startPlayback(
+          await _queueService.startPlayback(
             items: items ?? [],
             source: QueueItemSource(
               type: QueueItemSourceType.playlist,
@@ -647,374 +807,14 @@ class AndroidAutoHelper {
 
       _androidAutoHelperLogger.info("Playing from search: ${selectedResult.name}");
 
-      if (itemType == ContentType.albums.itemType) {
-        final album = selectedResult;
-        List<BaseItemDto>? items;
-
-        if (FinampSettingsHelper.finampSettings.isOffline) {
-          items = await _downloadsService.getCollectionTracks(album, playable: true);
-        } else {
-          items = await _jellyfinApiHelper.getItems(
-            parentItem: album,
-            includeItemTypes: ContentType.tracks.itemType?.jellyfinName,
-            sortBy: "ParentIndexNumber,IndexNumber,SortName",
-            sortOrder: "Ascending",
-            limit: 200,
-          );
-        }
-        _androidAutoHelperLogger.info("Playing album: ${album.name} (${items?.length} tracks)");
-
-        await queueService.startPlayback(
-          items: items ?? [],
-          source: QueueItemSource(
-            type: QueueItemSourceType.album,
-            name: QueueItemSourceName(type: QueueItemSourceNameType.preTranslated, pretranslatedName: album.name),
-            id: album.id,
-            item: album,
-          ),
-          order: FinampPlaybackOrder
-              .linear, //TODO add a setting that sets the default (because Android Auto doesn't give use the prompt as an extra), or use the current order?
-        );
-      } else if (itemType == ContentType.albumArtists.itemType) {
-        if (FinampSettingsHelper.finampSettings.isOffline) {
-          final artistAlbums = await getBaseItems(
-            MediaItemId(
-              contentType: ContentType.albumArtists,
-              parentType: MediaItemParentType.collection,
-              parentId: selectedResult.id,
-              itemId: selectedResult.id,
-            ),
-          );
-
-          final List<BaseItemDto> allTracks = [];
-          for (final album in artistAlbums) {
-            allTracks.addAll(await _downloadsService.getCollectionTracks(album, playable: true));
-          }
-
-          await queueService.startPlayback(
-            items: allTracks,
-            source: QueueItemSource(
-              type: QueueItemSourceType.artist,
-              name: QueueItemSourceName(
-                type: QueueItemSourceNameType.preTranslated,
-                pretranslatedName: selectedResult.name,
-              ),
-              id: selectedResult.id,
-              item: selectedResult,
-            ),
-            order: FinampPlaybackOrder.linear,
-          );
-        } else {
-          await audioServiceHelper.startInstantMixForArtists([selectedResult]).then((value) => 1);
-        }
-      } else {
-        if (FinampSettingsHelper.finampSettings.isOffline) {
-          List<DownloadStub> offlineItems;
-          // If we're on the tracks tab, just get all of the downloaded items
-          offlineItems = await _downloadsService.getAllTracks(
-            // nameFilter: widget.searchTerm,
-            viewFilter: finampUserHelper.currentUser?.currentView?.id,
-            nullableViewFilters: FinampSettingsHelper.finampSettings.showDownloadsWithUnknownLibrary,
-          );
-
-          var items = offlineItems.map((e) => e.baseItem).whereNotNull().toList();
-
-          items = sortItems(
-            items,
-            FinampSettingsHelper.finampSettings.tabSortBy[ContentType.tracks]!,
-            FinampSettingsHelper.finampSettings.tabSortOrder[ContentType.tracks]!,
-          );
-
-          final indexOfSelected = items.indexWhere((element) => element.id == selectedResult.id);
-
-          return await queueService.startPlayback(
-            items: items,
-            startingIndex: indexOfSelected,
-            source: QueueItemSource(
-              name: const QueueItemSourceName(type: QueueItemSourceNameType.mix),
-              type: QueueItemSourceType.allTracks,
-              id: selectedResult.id,
-              item: selectedResult,
-            ),
-          );
-        } else {
-          await audioServiceHelper.startInstantMixForItem(selectedResult).then((value) => 1);
-        }
-      }
+      // Todo how to handle selecting tracks - just do instant mix?  search downloads?
+      final slice = await _container.read(
+        getPlayableSliceProvider(item: FinampPlayableDto.fromItem(selectedResult), startingOffset: 0).future,
+      );
+      return _queueService.startSlicePlayback(slice);
     } catch (err) {
       _androidAutoHelperLogger.severe("Error while playing from search query: $err");
     }
-  }
-
-  Future<void> shuffleAllTracks() async {
-    final audioServiceHelper = GetIt.instance<AudioServiceHelper>();
-
-    try {
-      await audioServiceHelper.shuffleAll(onlyShowFavorites: FinampSettingsHelper.finampSettings.onlyShowFavorites);
-    } catch (err) {
-      _androidAutoHelperLogger.severe("Error while shuffling all tracks", err);
-    }
-  }
-
-  Future<List<MediaItem>> getMediaItems(MediaItemId itemId) async {
-    final queueService = GetIt.instance<QueueService>();
-    final List<MediaItem> mediaItems = [];
-
-    if (itemId.parentType == MediaItemParentType.recentlyPlayed) {
-      return _getRecentlyPlayedItems(itemId);
-    }
-
-    // Root collections are paginated to stay within the Android Auto Binder
-    // IPC limit (~1MB). Each page shows _pageSize items with a "More..." node
-    // appended when further pages exist.
-    if (itemId.parentType == MediaItemParentType.rootCollection) {
-      final nameFilter = itemId.nameFilter;
-
-      // --- Browse-by-Letter index: return A–Z + # nodes ---
-      if (nameFilter == _letterRootNameFilter) {
-        return _getLetterNodes(itemId);
-      }
-
-      // --- Letter page: items starting with nameFilter ---
-      if (nameFilter != null) {
-        final (items, totalCount) = await _fetchLetterPage(itemId);
-        final pageStart = itemId.pageStartIndex ?? 0;
-
-        for (final item in items) {
-          final mediaItem = await queueService.generateMediaItem(
-            item,
-            parentType: MediaItemParentType.collection,
-            parentId: item.parentId,
-            isPlayable: _isPlayable,
-          );
-          mediaItems.add(mediaItem);
-        }
-
-        if (pageStart + items.length < totalCount) {
-          final nextStart = pageStart + _pageSize;
-          final remaining = totalCount - nextStart;
-          mediaItems.add(
-            MediaItem(
-              id: MediaItemId(
-                contentType: itemId.contentType,
-                parentType: MediaItemParentType.rootCollection,
-                nameFilter: nameFilter,
-                pageStartIndex: nextStart,
-              ).toString(),
-              title: GlobalSnackbar.requireL10n.androidAutoMoreItems(remaining),
-              playable: false,
-            ),
-          );
-        }
-
-        return mediaItems;
-      }
-
-      // --- Flat paginated list (nameFilter == null) ---
-      if (itemId.contentType == ContentType.tracks) {
-        mediaItems.add(
-          MediaItem(
-            id: QueueItemSourceNameType.shuffleAll.name,
-            title: GlobalSnackbar.requireL10n.shuffleAll,
-            playable: true,
-          ),
-        );
-      }
-
-      if (itemId.contentType == ContentType.albumArtists &&
-          itemId.parentType == MediaItemParentType.collection &&
-          itemId.itemId != null) {
-        final instantMixId = MediaItemId(
-          contentType: ContentType.albumArtists,
-          parentType: MediaItemParentType.instantMix,
-          itemId: itemId.itemId,
-        );
-        mediaItems.add(
-          MediaItem(id: instantMixId.toString(), title: GlobalSnackbar.requireL10n.instantMix, playable: true),
-        );
-      }
-
-      // Albums, Artists, and Tracks support letter browsing.
-      // If letterFirst, return the A–Z index immediately; otherwise fall through to flat list.
-      final supportsLetterBrowse =
-          itemId.contentType == ContentType.albums ||
-          itemId.contentType == ContentType.albumArtists ||
-          itemId.contentType == ContentType.tracks;
-      final isLetterFirst =
-          FinampSettingsHelper.finampSettings.androidAutoBrowsingMode == AndroidAutoBrowsingMode.letterFirst;
-      if (supportsLetterBrowse && isLetterFirst) {
-        return _getLetterNodes(itemId);
-      }
-
-      // For flat list mode: "Browse by Letter" node only on first page, if supported.
-      final pageStart = itemId.pageStartIndex ?? 0;
-      if (pageStart == 0 && supportsLetterBrowse && !isLetterFirst) {
-        mediaItems.add(
-          MediaItem(
-            id: MediaItemId(
-              contentType: itemId.contentType,
-              parentType: MediaItemParentType.rootCollection,
-              nameFilter: _letterRootNameFilter,
-            ).toString(),
-            title: GlobalSnackbar.requireL10n.androidAutoBrowseByLetter,
-            playable: false,
-          ),
-        );
-      }
-
-      final (items, totalCount) = await _fetchRootPage(itemId);
-
-      for (final item in items) {
-        final mediaItem = await queueService.generateMediaItem(
-          item,
-          parentType: MediaItemParentType.collection,
-          parentId: item.parentId,
-          isPlayable: _isPlayable,
-        );
-        mediaItems.add(mediaItem);
-      }
-
-      // Guard against Jellyfin returning a slightly inflated totalRecordCount
-      // (observed with playlists), which would produce a negative remaining count.
-      if (pageStart + items.length < totalCount) {
-        final nextStart = pageStart + _pageSize;
-        final remaining = totalCount - nextStart;
-        if (remaining > 0) {
-          mediaItems.add(
-            MediaItem(
-              id: MediaItemId(
-                contentType: itemId.contentType,
-                parentType: MediaItemParentType.rootCollection,
-                pageStartIndex: nextStart,
-              ).toString(),
-              title: GlobalSnackbar.requireL10n.androidAutoMoreItems(remaining),
-              playable: false,
-            ),
-          );
-        }
-      }
-
-      return mediaItems;
-    }
-
-    final items = await getBaseItems(itemId);
-
-    for (final item in items) {
-      final mediaItem = await queueService.generateMediaItem(
-        item,
-        parentType: MediaItemParentType.collection,
-        parentId: item.parentId,
-        isPlayable: _isPlayable,
-      );
-      mediaItems.add(mediaItem);
-    }
-    return mediaItems;
-  }
-
-  Future<void> playFromMediaId(MediaItemId itemId) async {
-    final audioServiceHelper = GetIt.instance<AudioServiceHelper>();
-    final finampUserHelper = GetIt.instance<FinampUserHelper>();
-    // queue service should be initialized by time we get here
-    final queueService = GetIt.instance<QueueService>();
-
-    if (itemId.parentType == MediaItemParentType.instantMix) {
-      if (itemId.contentType == ContentType.albumArtists) {
-        final parentItem = await getParentFromId(itemId.itemId!);
-        if (FinampSettingsHelper.finampSettings.isOffline) {
-          final artistAlbums = await getBaseItems(
-            MediaItemId(
-              contentType: ContentType.albumArtists,
-              parentType: MediaItemParentType.collection,
-              itemId: itemId.itemId,
-            ),
-          );
-          final List<BaseItemDto> allTracks = [];
-          for (final album in artistAlbums) {
-            allTracks.addAll(await _downloadsService.getCollectionTracks(album, playable: true));
-          }
-          return await queueService.startPlayback(
-            items: allTracks,
-            source: QueueItemSource(
-              type: QueueItemSourceType.artist,
-              name: QueueItemSourceName(
-                type: QueueItemSourceNameType.preTranslated,
-                pretranslatedName: parentItem?.name,
-              ),
-              id: itemId.itemId!,
-              item: parentItem,
-            ),
-            order: FinampPlaybackOrder.linear,
-          );
-        } else {
-          if (parentItem == null) {
-            _androidAutoHelperLogger.warning("Could not resolve artist item for instant mix: ${itemId.itemId}");
-            return;
-          }
-          return await audioServiceHelper.startInstantMixForArtists([parentItem]);
-        }
-      }
-      if (FinampSettingsHelper.finampSettings.isOffline) {
-        List<DownloadStub> offlineItems;
-        // If we're on the tracks tab, just get all of the downloaded items
-        offlineItems = await _downloadsService.getAllTracks(
-          // nameFilter: widget.searchTerm,
-          viewFilter: finampUserHelper.currentUser?.currentView?.id,
-          nullableViewFilters: FinampSettingsHelper.finampSettings.showDownloadsWithUnknownLibrary,
-        );
-
-        var items = offlineItems.map((e) => e.baseItem).whereNotNull().toList();
-
-        items = sortItems(
-          items,
-          FinampSettingsHelper.finampSettings.tabSortBy[ContentType.tracks]!,
-          FinampSettingsHelper.finampSettings.tabSortOrder[ContentType.tracks]!,
-        );
-
-        final indexOfSelected = items.indexWhere((element) => element.id == itemId.itemId);
-
-        return await queueService.startPlayback(
-          items: items,
-          startingIndex: indexOfSelected,
-          source: QueueItemSource(
-            name: const QueueItemSourceName(type: QueueItemSourceNameType.mix),
-            type: QueueItemSourceType.allTracks,
-            id: itemId.itemId!,
-            item: items[indexOfSelected],
-          ),
-        );
-      } else {
-        return await audioServiceHelper.startInstantMixForItem(await _jellyfinApiHelper.getItemById(itemId.itemId!));
-      }
-    }
-
-    // shouldn't happen, but just in case
-    if (!_isPlayable(contentType: itemId.contentType)) {
-      _androidAutoHelperLogger.warning(
-        "Tried to play from media id with non-playable item type ${itemId.parentType.name}",
-      );
-      return;
-    }
-
-    if (itemId.parentType != MediaItemParentType.collection || itemId.itemId == null) {
-      _androidAutoHelperLogger.warning(
-        "Tried to play from media id with invalid parent type '${itemId.parentType.name}' or null id",
-      );
-      return;
-    }
-    // get all tracks of current parent
-    final parentItem = await getParentFromId(itemId.itemId!);
-
-    final parentBaseItems = await getBaseItems(itemId);
-
-    await queueService.startPlayback(
-      items: parentBaseItems,
-      source: QueueItemSource(
-        type: itemId.contentType == ContentType.playlists ? QueueItemSourceType.playlist : QueueItemSourceType.album,
-        name: QueueItemSourceName(type: QueueItemSourceNameType.preTranslated, pretranslatedName: parentItem?.name),
-        id: parentItem?.id ?? itemId.parentId!,
-        item: parentItem,
-      ),
-    );
   }
 
   Future<List<BaseItemDto>> _searchTracks(AndroidAutoSearchQuery searchQuery, {int limit = 20}) async {
