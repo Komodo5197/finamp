@@ -109,9 +109,6 @@ class FinampSettingsAdapter extends TypeAdapter<FinampSettings> {
         volumeNormalizationMode: fields[33] == null
             ? VolumeNormalizationMode.hybrid
             : fields[33] as VolumeNormalizationMode,
-        contentViewType: fields[10] == null
-            ? ContentViewType.list
-            : fields[10] as ContentViewType,
         playbackSpeedVisibility: fields[57] == null
             ? PlaybackSpeedVisibility.automatic
             : fields[57] as PlaybackSpeedVisibility,
@@ -450,12 +447,26 @@ class FinampSettingsAdapter extends TypeAdapter<FinampSettings> {
             : (fields[150] as num).toInt(),
         useAndroidGainEffect: fields[149] == null ? true : fields[149] as bool,
         deviceId: fields[152] == null ? 'unset' : fields[152] as String,
-        androidAutoBrowsingMode: fields[154] == null
-            ? AndroidAutoBrowsingMode.flat
-            : fields[154] as AndroidAutoBrowsingMode,
+        clientCertificate: fields[151] == null
+            ? DefaultSettings.clientCertificate
+            : fields[151] as ClientCertificate?,
+        showQuickActionsBanner: fields[154] == null
+            ? true
+            : fields[154] as bool,
+        perTabContentViewType: fields[155] == null
+            ? {
+                ContentType.albums: ContentViewType.list,
+                ContentType.genericArtists: ContentViewType.list,
+                ContentType.albumArtists: ContentViewType.list,
+                ContentType.performingArtists: ContentViewType.list,
+                ContentType.playlists: ContentViewType.list,
+                ContentType.genres: ContentViewType.list,
+              }
+            : (fields[155] as Map).cast<ContentType, ContentViewType>(),
       )
       ..sortBy = fields[7] as SortBy?
       ..sortOrder = fields[8] as SortOrder?
+      ..contentViewType = fields[10] as ContentViewType?
       ..disableGesture = fields[19] == null ? false : fields[19] as bool
       ..showFastScroller = fields[25] == null ? true : fields[25] as bool
       ..defaultDownloadLocation = fields[58] as String?
@@ -469,14 +480,13 @@ class FinampSettingsAdapter extends TypeAdapter<FinampSettings> {
       ..radioEnabled = fields[140] == null ? false : fields[140] as bool
       ..radioMode = fields[141] == null
           ? RadioMode.similar
-          : fields[141] as RadioMode
-      ..clientCertificate = fields[151] as ClientCertificate?;
+          : fields[141] as RadioMode;
   }
 
   @override
   void write(BinaryWriter writer, FinampSettings obj) {
     writer
-      ..writeByte(148)
+      ..writeByte(149)
       ..writeByte(0)
       ..write(obj.isOffline)
       ..writeByte(1)
@@ -772,7 +782,9 @@ class FinampSettingsAdapter extends TypeAdapter<FinampSettings> {
       ..writeByte(153)
       ..write(obj.verboseLogging)
       ..writeByte(154)
-      ..write(obj.androidAutoBrowsingMode);
+      ..write(obj.showQuickActionsBanner)
+      ..writeByte(155)
+      ..write(obj.perTabContentViewType);
   }
 
   @override
@@ -1250,6 +1262,49 @@ class FinampHistoryItemAdapter extends TypeAdapter<FinampHistoryItem> {
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is FinampHistoryItemAdapter &&
+          runtimeType == other.runtimeType &&
+          typeId == other.typeId;
+}
+
+class MediaItemIdAdapter extends TypeAdapter<MediaItemId> {
+  @override
+  final typeId = 69;
+
+  @override
+  MediaItemId read(BinaryReader reader) {
+    final numOfFields = reader.readByte();
+    final fields = <int, dynamic>{
+      for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
+    };
+    return MediaItemId(
+      contentType: fields[0] as ContentType,
+      parentType: fields[1] as MediaItemParentType,
+      itemId: fields[2] as BaseItemId?,
+      parentId: fields[3] as BaseItemId?,
+    );
+  }
+
+  @override
+  void write(BinaryWriter writer, MediaItemId obj) {
+    writer
+      ..writeByte(4)
+      ..writeByte(0)
+      ..write(obj.contentType)
+      ..writeByte(1)
+      ..write(obj.parentType)
+      ..writeByte(2)
+      ..write(obj.itemId)
+      ..writeByte(3)
+      ..write(obj.parentId);
+  }
+
+  @override
+  int get hashCode => typeId.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is MediaItemIdAdapter &&
           runtimeType == other.runtimeType &&
           typeId == other.typeId;
 }
@@ -2584,6 +2639,47 @@ class PlaybackSpeedVisibilityAdapter
           typeId == other.typeId;
 }
 
+class MediaItemParentTypeAdapter extends TypeAdapter<MediaItemParentType> {
+  @override
+  final typeId = 68;
+
+  @override
+  MediaItemParentType read(BinaryReader reader) {
+    switch (reader.readByte()) {
+      case 0:
+        return MediaItemParentType.collection;
+      case 1:
+        return MediaItemParentType.rootCollection;
+      case 2:
+        return MediaItemParentType.instantMix;
+      default:
+        return MediaItemParentType.collection;
+    }
+  }
+
+  @override
+  void write(BinaryWriter writer, MediaItemParentType obj) {
+    switch (obj) {
+      case MediaItemParentType.collection:
+        writer.writeByte(0);
+      case MediaItemParentType.rootCollection:
+        writer.writeByte(1);
+      case MediaItemParentType.instantMix:
+        writer.writeByte(2);
+    }
+  }
+
+  @override
+  int get hashCode => typeId.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is MediaItemParentTypeAdapter &&
+          runtimeType == other.runtimeType &&
+          typeId == other.typeId;
+}
+
 class LyricsAlignmentAdapter extends TypeAdapter<LyricsAlignment> {
   @override
   final typeId = 70;
@@ -3700,44 +3796,6 @@ class ItemFilterTypeAdapter extends TypeAdapter<ItemFilterType> {
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is ItemFilterTypeAdapter &&
-          runtimeType == other.runtimeType &&
-          typeId == other.typeId;
-}
-
-class AndroidAutoBrowsingModeAdapter
-    extends TypeAdapter<AndroidAutoBrowsingMode> {
-  @override
-  final typeId = 128;
-
-  @override
-  AndroidAutoBrowsingMode read(BinaryReader reader) {
-    switch (reader.readByte()) {
-      case 0:
-        return AndroidAutoBrowsingMode.flat;
-      case 1:
-        return AndroidAutoBrowsingMode.letterFirst;
-      default:
-        return AndroidAutoBrowsingMode.flat;
-    }
-  }
-
-  @override
-  void write(BinaryWriter writer, AndroidAutoBrowsingMode obj) {
-    switch (obj) {
-      case AndroidAutoBrowsingMode.flat:
-        writer.writeByte(0);
-      case AndroidAutoBrowsingMode.letterFirst:
-        writer.writeByte(1);
-    }
-  }
-
-  @override
-  int get hashCode => typeId.hashCode;
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is AndroidAutoBrowsingModeAdapter &&
           runtimeType == other.runtimeType &&
           typeId == other.typeId;
 }
@@ -9478,34 +9536,51 @@ const _$FinampCollectionTypeEnumMap = {
 };
 
 MediaItemId _$MediaItemIdFromJson(Map<String, dynamic> json) => MediaItemId(
-  type: $enumDecode(_$MediaItemTypeEnumMap, json['type']),
+  contentType: $enumDecode(_$ContentTypeEnumMap, json['contentType']),
+  parentType: $enumDecode(_$MediaItemParentTypeEnumMap, json['parentType']),
   itemId: _$JsonConverterFromJson<String, BaseItemId>(
     json['itemId'],
     const BaseItemIdConverter().fromJson,
   ),
-  tabIndex: (json['tabIndex'] as num?)?.toInt(),
-  nameFilter: json['nameFilter'] as String?,
-  pageIndex: (json['pageIndex'] as num?)?.toInt(),
+  parentId: _$JsonConverterFromJson<String, BaseItemId>(
+    json['parentId'],
+    const BaseItemIdConverter().fromJson,
+  ),
 );
 
 Map<String, dynamic> _$MediaItemIdToJson(MediaItemId instance) =>
     <String, dynamic>{
-      'type': _$MediaItemTypeEnumMap[instance.type]!,
-      if (_$JsonConverterToJson<String, BaseItemId>(
-            instance.itemId,
-            const BaseItemIdConverter().toJson,
-          )
-          case final value?)
-        'itemId': value,
-      if (instance.tabIndex case final value?) 'tabIndex': value,
-      if (instance.nameFilter case final value?) 'nameFilter': value,
-      if (instance.pageIndex case final value?) 'pageIndex': value,
+      'contentType': _$ContentTypeEnumMap[instance.contentType]!,
+      'parentType': _$MediaItemParentTypeEnumMap[instance.parentType]!,
+      'itemId': _$JsonConverterToJson<String, BaseItemId>(
+        instance.itemId,
+        const BaseItemIdConverter().toJson,
+      ),
+      'parentId': _$JsonConverterToJson<String, BaseItemId>(
+        instance.parentId,
+        const BaseItemIdConverter().toJson,
+      ),
     };
 
-const _$MediaItemTypeEnumMap = {
-  MediaItemType.root: 'root',
-  MediaItemType.tab: 'tab',
-  MediaItemType.item: 'item',
+const _$ContentTypeEnumMap = {
+  ContentType.albums: 'albums',
+  ContentType.genericArtists: 'genericArtists',
+  ContentType.playlists: 'playlists',
+  ContentType.genres: 'genres',
+  ContentType.tracks: 'tracks',
+  ContentType.home: 'home',
+  ContentType.performingArtists: 'performingArtists',
+  ContentType.albumArtists: 'albumArtists',
+  ContentType.inPlaylist: 'inPlaylist',
+  ContentType.mixed: 'mixed',
+  ContentType.inPerformingArtistAlbums: 'inPerformingArtistAlbums',
+  ContentType.inAlbumArtistAlbums: 'inAlbumArtistAlbums',
+};
+
+const _$MediaItemParentTypeEnumMap = {
+  MediaItemParentType.collection: 'collection',
+  MediaItemParentType.rootCollection: 'rootCollection',
+  MediaItemParentType.instantMix: 'instantMix',
 };
 
 Value? _$JsonConverterFromJson<Json, Value>(
@@ -9604,21 +9679,6 @@ Map<String, dynamic> _$TabsHomeSectionToJson(TabsHomeSection instance) =>
       'contentType': _$ContentTypeEnumMap[instance.contentType]!,
       'libraryId': const LibraryIdConverter().toJson(instance.libraryId),
     };
-
-const _$ContentTypeEnumMap = {
-  ContentType.albums: 'albums',
-  ContentType.genericArtists: 'genericArtists',
-  ContentType.playlists: 'playlists',
-  ContentType.genres: 'genres',
-  ContentType.tracks: 'tracks',
-  ContentType.home: 'home',
-  ContentType.performingArtists: 'performingArtists',
-  ContentType.albumArtists: 'albumArtists',
-  ContentType.inPlaylist: 'inPlaylist',
-  ContentType.mixed: 'mixed',
-  ContentType.inPerformingArtistAlbums: 'inPerformingArtistAlbums',
-  ContentType.inAlbumArtistAlbums: 'inAlbumArtistAlbums',
-};
 
 CollectionHomeSection _$CollectionHomeSectionFromJson(
   Map<String, dynamic> json,

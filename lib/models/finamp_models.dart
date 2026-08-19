@@ -127,7 +127,14 @@ class DefaultSettings {
   // Ideally the maximum gain in each library should be fetched from the server, and this volume should be adjusted accordingly to be the exact inverse, so that the quietest track in the library plays at 100% volume, and only louder tracks get their volume reduced
   static const volumeNormalizationIOSBaseGain = 6.0;
   static const volumeNormalizationMode = VolumeNormalizationMode.hybrid;
-  static const contentViewType = ContentViewType.list;
+  static const perTabContentViewType = {
+    ContentType.albums: ContentViewType.list,
+    ContentType.genericArtists: ContentViewType.list,
+    ContentType.albumArtists: ContentViewType.list,
+    ContentType.performingArtists: ContentViewType.list,
+    ContentType.playlists: ContentViewType.list,
+    ContentType.genres: ContentViewType.list,
+  };
   static const playbackSpeedVisibility = PlaybackSpeedVisibility.automatic;
   static const showTextOnGridView = true;
   static const sleepTimerDurationSeconds = 60 * 30;
@@ -310,6 +317,7 @@ class DefaultSettings {
   static int get gridImageSize => isDesktop ? gridImageSizeDesktop : gridImageSizeMobile;
   static const useAndroidGainEffect = true;
   static const ClientCertificate? clientCertificate = null;
+  static const showQuickActionsBanner = true;
   static const androidAutoBrowsingMode = AndroidAutoBrowsingMode.flat;
 }
 
@@ -330,7 +338,6 @@ class FinampSettings {
     this.volumeNormalizationActive = DefaultSettings.volumeNormalizationActive,
     this.volumeNormalizationIOSBaseGain = DefaultSettings.volumeNormalizationIOSBaseGain,
     this.volumeNormalizationMode = DefaultSettings.volumeNormalizationMode,
-    this.contentViewType = DefaultSettings.contentViewType,
     this.playbackSpeedVisibility = DefaultSettings.playbackSpeedVisibility,
     this.contentGridViewCrossAxisCountPortrait,
     this.contentGridViewCrossAxisCountLandscape,
@@ -457,6 +464,9 @@ class FinampSettings {
     required this.homeScreenImageSize,
     this.useAndroidGainEffect = DefaultSettings.useAndroidGainEffect,
     required this.deviceId,
+    this.clientCertificate = DefaultSettings.clientCertificate,
+    this.showQuickActionsBanner = DefaultSettings.showQuickActionsBanner,
+    this.perTabContentViewType = DefaultSettings.perTabContentViewType,
     this.androidAutoBrowsingMode = DefaultSettings.androidAutoBrowsingMode,
   });
 
@@ -498,8 +508,9 @@ class FinampSettings {
   int trackShuffleItemCount;
 
   /// The content view type used by the music screen.
-  @HiveField(10, defaultValue: DefaultSettings.contentViewType)
-  ContentViewType contentViewType;
+  @HiveField(10)
+  @Deprecated("Use perTabContentViewType")
+  ContentViewType? contentViewType;
 
   /// Amount of grid tiles to use per-row when portrait.
   @HiveField(11)
@@ -937,7 +948,7 @@ class FinampSettings {
   int homeScreenImageSize;
 
   @HiveField(151, defaultValue: DefaultSettings.clientCertificate)
-  ClientCertificate? clientCertificate = DefaultSettings.clientCertificate;
+  ClientCertificate? clientCertificate;
 
   /// Unique ID that stays the same for an install but may change across reinstalls
   /// Used to identify client activity within Jellyfin
@@ -951,7 +962,14 @@ class FinampSettings {
   @HiveField(153, defaultValue: DefaultSettings.verboseLogging)
   bool verboseLogging = DefaultSettings.verboseLogging;
 
-  @HiveField(154, defaultValue: DefaultSettings.androidAutoBrowsingMode)
+  @HiveField(154, defaultValue: DefaultSettings.showQuickActionsBanner)
+  bool showQuickActionsBanner;
+
+  @HiveField(155, defaultValue: DefaultSettings.perTabContentViewType)
+  @SettingsHelperMap("tabContentType")
+  Map<ContentType, ContentViewType> perTabContentViewType;
+
+  @HiveField(156, defaultValue: DefaultSettings.androidAutoBrowsingMode)
   AndroidAutoBrowsingMode androidAutoBrowsingMode = DefaultSettings.androidAutoBrowsingMode;
 
   static Future<FinampSettings> create() async {
@@ -1710,6 +1728,7 @@ class DownloadItem extends DownloadStub {
         // Not all BaseItemDto are requested with mediaSources, mediaStreams or childCount.  Do not
         // overwrite with null if the new item does not have them.
         item.mediaSources ??= baseItem?.mediaSources;
+        item.people ??= baseItem?.people;
         item.sortName ??= baseItem?.sortName;
       }
       assert(
@@ -1722,7 +1741,7 @@ class DownloadItem extends DownloadStub {
         if (viewId == null || viewId == this.viewId) {
           if (item == null || baseItem!.mostlyEqual(item)) {
             var equal = const DeepCollectionEquality().equals;
-            if (equal(newOrderedChildren, orderedChildren)) {
+            if (newOrderedChildren == null || equal(newOrderedChildren, orderedChildren)) {
               return null;
             }
           }
