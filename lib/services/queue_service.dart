@@ -1432,25 +1432,10 @@ class QueueService {
 
   /// [contextNormalizationGain] is the normalization gain of the context that the track is being played in, e.g. the album
   /// Should only be used when the tracks within that context come from the same source, e.g. the same album (or maybe artist?). Usually makes no sense for playlists.
-  Future<MediaItem> generateMediaItem(
-    jellyfin_models.BaseItemDto item, {
-    double? contextNormalizationGain,
-    MediaItemType? itemType,
-    bool Function({jellyfin_models.BaseItemDto? item, ContentType? contentType})? isPlayable,
-  }) async {
+  Future<MediaItem> generateMediaItem(jellyfin_models.BaseItemDto item, {double? contextNormalizationGain}) async {
     const uuid = Uuid();
 
-    MediaItemId? itemId;
-    bool isAndroidAutoOrMediaBrowserRequest = false;
-
-    if (itemType != null) {
-      assert(itemType == MediaItemType.item);
-      isAndroidAutoOrMediaBrowserRequest = true;
-      itemId = MediaItemId(type: MediaItemType.item, itemId: item.id);
-    }
-
     bool isDownloaded = false;
-    bool isItemPlayable = isPlayable?.call(item: item) ?? true;
     DownloadItem? downloadedTrack;
     DownloadStub? downloadedCollection;
 
@@ -1465,39 +1450,13 @@ class QueueService {
       }
     }
 
-    Uri? artUri = isAndroidAutoOrMediaBrowserRequest
-        ? _providers.read(albumImageProvider(AlbumImageRequest(item: item, maxHeight: 200, maxWidth: 200))).uri
-        : null;
-
-    // use content provider for handling media art on Android
-    if (Platform.isAndroid && isAndroidAutoOrMediaBrowserRequest) {
-      final packageInfo = await PackageInfo.fromPlatform();
-      // replace with placeholder art
-      if (artUri == null) {
-        final applicationSupportDirectory = await getApplicationSupportDirectory();
-        artUri = Uri(
-          scheme: "content",
-          host: packageInfo.packageName,
-          path: path_helper.join(applicationSupportDirectory.absolute.path, Assets.images.albumWhite.path),
-        );
-      } else {
-        // store the origin in fragment since it should be unused
-        artUri = Uri(
-          scheme: "content",
-          host: packageInfo.packageName,
-          path: artUri.path,
-          fragment: ["http", "https"].contains(artUri.scheme) ? artUri.origin : null,
-        );
-      }
-    }
-
     return MediaItem(
-      id: itemId?.toString() ?? uuid.v4(),
+      id: uuid.v4(),
       playable:
-          isItemPlayable, // this dictates whether clicking on an item will try to play it or browse it in media browsers like Android Auto
+          true, // this dictates whether clicking on an item will try to play it or browse it in media browsers like Android Auto
       album: item.album,
       artist: item.artists?.sortedBy((e) => e).join(", ") ?? item.albumArtist,
-      title: item.name ?? "unknown",
+      title: item.name ?? GlobalSnackbar.requireL10n.unknown,
       extras: {
         //!!! this ID has to be consistent across the transcoding URL and the playback reporting status, otherwise the server won't show that we're transcoding
         "playSessionId": uuid.v4(),
@@ -1512,7 +1471,8 @@ class QueueService {
       },
       // Jellyfin returns microseconds * 10 for some reason
       duration: item.runTimeTicksDuration(),
-      artUri: artUri,
+      // This will be updated once we have cached the cover
+      artUri: null,
     );
   }
 }

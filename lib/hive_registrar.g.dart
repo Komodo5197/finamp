@@ -10,6 +10,8 @@ extension HiveRegistrar on HiveInterface {
   void registerAdapters() {
     registerAdapter(AccessScheduleAdapter());
     registerAdapter(AndroidAutoBrowsingModeAdapter());
+    registerAdapter(AndroidAutoTabAdapter());
+    registerAdapter(AndroidAutoTabTypeAdapter());
     registerAdapter(ArtistItemSectionsAdapter());
     registerAdapter(ArtistTypeAdapter());
     registerAdapter(AuthenticationResultAdapter());
@@ -122,6 +124,8 @@ extension IsolatedHiveRegistrar on IsolatedHiveInterface {
   void registerAdapters() {
     registerAdapter(AccessScheduleAdapter());
     registerAdapter(AndroidAutoBrowsingModeAdapter());
+    registerAdapter(AndroidAutoTabAdapter());
+    registerAdapter(AndroidAutoTabTypeAdapter());
     registerAdapter(ArtistItemSectionsAdapter());
     registerAdapter(ArtistTypeAdapter());
     registerAdapter(AuthenticationResultAdapter());

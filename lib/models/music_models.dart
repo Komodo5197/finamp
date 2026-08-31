@@ -351,7 +351,7 @@ class Artist<ChildType extends FinampPlayableDto> extends _SortableItem<ChildTyp
   int get hashHelper => Object.hash(Artist, type, library);
 
   @override
-  Artist copyWith(ResolvedSortConfig newSort) =>
+  Artist<ChildType> copyWith(ResolvedSortConfig newSort) =>
       Artist(item, source: source, sortConfig: newSort, type: type, library: library);
 }
 
@@ -432,7 +432,7 @@ class Genre<ChildType extends FinampPlayableDto> extends _SortablePagedItem<Chil
   int get hashHelper => Object.hash(Genre, type, library);
 
   @override
-  Genre copyWith(ResolvedSortConfig newSort) =>
+  Genre<ChildType> copyWith(ResolvedSortConfig newSort) =>
       Genre(item, source: source, sortConfig: newSort, type: type, library: library);
 
   @override

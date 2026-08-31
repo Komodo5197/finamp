@@ -96,7 +96,7 @@ sealed class FinampSortable<ChildType extends FinampDisplayableOrPlayable> exten
   final ResolvedSortConfig sortConfig;
 
   // TODO consider some sort of isValid method to make sure the incoming config makes sense?
-  FinampSortable copyWith(ResolvedSortConfig newSort);
+  FinampSortable<ChildType> copyWith(ResolvedSortConfig newSort);
 }
 
 //

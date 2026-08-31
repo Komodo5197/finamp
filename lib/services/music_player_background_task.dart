@@ -996,7 +996,7 @@ class MusicPlayerBackgroundTask extends BaseAudioHandler with SeekHandler, Queue
     if (parentMediaId == AudioService.recentRootId) {
       return super.subscribeToChildren(parentMediaId);
     } else {
-      // TODO is it worth adding subscriptions for anything but the roo?  maybe the tabs?
+      // TODO is it worth adding subscriptions for anything but the root?  maybe the tabs?
       // I don't think we have any reasonable way to dispose of loaded items, because theres no exit callback.
       // on the other hand, for stuff like genres we need to keep the paging alive?
       // we could just hard fork it to use the getChildrenProvider and loadHomeSectionItemsProvider directly.
@@ -1005,7 +1005,7 @@ class MusicPlayerBackgroundTask extends BaseAudioHandler with SeekHandler, Queue
             ? MediaItemId(type: MediaItemType.root)
             : MediaItemId.fromJson(jsonDecode(parentMediaId) as Map<String, dynamic>);
 
-        if (itemId.type == MediaItemType.tab && itemId.tabIndex == 2) {
+        if (itemId.type == MediaItemType.item) {
           return super.subscribeToChildren(parentMediaId);
         }
 

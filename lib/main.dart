@@ -515,6 +515,14 @@ void _migrateHomescreen() {
     changed = true;
   }
 
+  // TODO move to its own function
+  if (finampSettings.androidAutoTabs.isEmpty || true) {
+    // we set this here because it's a non-constant value
+    finampSettings.androidAutoTabs = DefaultSettings.androidAutoTabs;
+
+    changed = true;
+  }
+
   if (!finampSettings.tabOrder.contains(ContentType.albumArtists)) {
     finampSettings.tabOrder.add(ContentType.albumArtists);
 

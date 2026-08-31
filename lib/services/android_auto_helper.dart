@@ -1,7 +1,11 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:audio_service/audio_service.dart';
 import 'package:collection/collection.dart';
 import 'package:finamp/components/MusicScreen/sort_and_filter_row.dart';
 import 'package:finamp/components/global_snackbar.dart';
+import 'package:finamp/extensions/list.dart';
 import 'package:finamp/models/finamp_models.dart';
 import 'package:finamp/models/jellyfin_models.dart';
 import 'package:finamp/services/downloads_service.dart';
@@ -9,9 +13,15 @@ import 'package:finamp/services/item_by_id_provider.dart';
 import 'package:finamp/services/music_providers.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:get_it/get_it.dart';
+import 'package:infinite_scroll_pagination/infinite_scroll_pagination.dart';
 import 'package:logging/logging.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:path/path.dart' as path_helper;
+import 'package:path_provider/path_provider.dart';
 
+import '../gen/assets.gen.dart';
 import '../models/music_models.dart';
+import 'album_image_provider.dart';
 import 'audio_service_helper.dart';
 import 'finamp_settings_helper.dart';
 import 'finamp_user_helper.dart';
@@ -26,35 +36,6 @@ class AndroidAutoSearchQuery {
   AndroidAutoSearchQuery(this.rawQuery, this.extras);
 }
 
-// Planned structure
-// strip down mediaitems used outside of queue.
-// make media id just have item id, page state (list/grid/paged offset/letter grid/filtered letter) - might need parent context?  track playback needs it.
-//   - maybe can avoid track playback if we disable album browse?  but might need anyway for item type home sections or performing artist browsing.
-//   - maybe we just use appears on albums for performingArtist, but use tracks for play/shuffle.
-// add getChildren provider - convert media id to playable, then get children, then convert to mediaitems + add extras.
-// provider can be read/listened to by getChildren+subscribe.  Playback easy with playable conversion.
-// play from search still needs to be seperated from regular due to slightly different logic
-// tabs will be home sections with new type tracking that follows main app tab sorting.
-// don't include full info in media id - just have a tab index and look it up in the backend.
-
-// can have choice to play, shuffle browse list, or brose grid for all collection contentTypes.  Too much?
-// - we'd need to handle tracks vs albums for artists - should we just have album vs performing split?
-// - would people want tabs handled differently than in-artist?  Is tracking main screen still cleaner?
-// - maybe do this later, and just use browse artist + currents?  How to handle artists with just tracks?
-// - does none search screens support group hints?  that could be nice.
-
-// Implementation
-// step 0 - move search code into independant class?  add os_integration folder?
-// first, build the provider.  Use existing media ids, just use playables for item children fetching
-// Then expand it to do page fetching for the current tab types - hardwire playable lookups.
-// add subscription function, verify changing the setting causes tab reload.
-// clean up media item id for minimum info.  Reduce browsing mediaItems & consider increasing page size?
-// add const home section list to convert tab fetches from - new tracking type + allow browsing style choice?  Or just track.
-//    - this is the first real UX question step.  per-tab list vs grid vs letter?  allow grid under letters?
-// Add real UI for editing tabs.  Only allow tracking + tab?  Should tracking be an option on all tab sections?
-// Consider adding item sections - would need to get album browsing working.
-// consider adding browsing style selectors for all contentTypes?
-
 class AndroidAutoHelper {
   static final _androidAutoHelperLogger = Logger("AndroidAutoHelper");
 
@@ -68,7 +49,7 @@ class AndroidAutoHelper {
 
   /// Maximum items returned per Android Auto browse page.
   /// Kept well under the ~1MB Binder IPC limit.
-  static const int _pageSize = 200;
+  static const int _pageSize = 300;
 
   // actively remembered search query because Android Auto doesn't give us the extras during a regular search (e.g. clicking the "Search Results" button on the player screen after a voice search)
   AndroidAutoSearchQuery? _lastSearchQuery;
@@ -132,7 +113,8 @@ class AndroidAutoHelper {
   /// Jellyfin only tracks DatePlayed on individual tracks, not on album items.
   /// So we query recently played tracks, deduplicate by albumId, then fetch
   /// those albums by ID to get full artwork + metadata.
-  Future<List<MediaItem>> _getRecentlyPlayedItems(MediaItemId itemId) async {
+  Future<List<MediaItem>> _getRecentlyPlayedAlbums() async {
+    // TODO do we keep this func?  If so, refactor
     if (FinampSettingsHelper.finampSettings.isOffline) {
       return [
         MediaItem(
@@ -185,11 +167,7 @@ class AndroidAutoHelper {
 
       final List<MediaItem> mediaItems = [];
       for (final item in sortedItems) {
-        final mediaItem = await queueService.generateMediaItem(
-          item,
-          itemType: MediaItemType.item,
-          isPlayable: _isPlayable,
-        );
+        final mediaItem = await _generateMediaItem(item, isPlayable: _isPlayable);
         mediaItems.add(mediaItem);
       }
       return mediaItems;
@@ -206,11 +184,7 @@ class AndroidAutoHelper {
       final recentItems = queueService.peekQueue(previous: 5);
       final List<MediaItem> recentMediaItems = [];
       for (final item in recentItems) {
-        final mediaItem = await queueService.generateMediaItem(
-          item.baseItem,
-          itemType: MediaItemType.item,
-          isPlayable: _isPlayable,
-        );
+        final mediaItem = await _generateMediaItem(item.baseItem, isPlayable: _isPlayable);
         recentMediaItems.add(mediaItem);
       }
       return recentMediaItems;
@@ -239,26 +213,7 @@ class AndroidAutoHelper {
       case MediaItemType.root:
         throw UnsupportedError("Cant play the home screen");
       case MediaItemType.tab:
-        final content = [
-          ContentType.albums,
-          ContentType.albumArtists,
-          ContentType.albums,
-          ContentType.playlists,
-          ContentType.genres,
-          ContentType.tracks,
-        ][mediaId.tabIndex!];
-        final sortControl = SortAndFilterController.trackSettings(content);
-        return MusicScreenPlayable(
-          tab: content,
-          library: currentLibraryPlaceholder,
-          source: QueueItemSource.rawId(
-            type: QueueItemSourceType.allTracks,
-            // TODO fix source
-            name: QueueItemSourceName(type: QueueItemSourceNameType.preTranslated, pretranslatedName: "AA"),
-            id: "AA",
-          ),
-          sortConfig: ref.watch(resolveSortProvider(sortControl)).copyWithCharacterFilter(mediaId.nameFilter),
-        );
+        throw UnsupportedError("Cant play tabs");
       case MediaItemType.item:
         final item = await ref.watch(itemByIdProvider(mediaId.itemId!).future);
         if (item == null) {
@@ -278,44 +233,52 @@ class AndroidAutoHelper {
       case MediaItemType.root:
         return _getRootMenu(ref);
       case MediaItemType.tab:
-        final content = [
-          ContentType.albums,
-          ContentType.albumArtists,
-          ContentType.albums,
-          ContentType.playlists,
-          ContentType.genres,
-          ContentType.tracks,
-        ][mediaId.tabIndex!];
-        final supportsLetterBrowse = [
-          ContentType.albums,
-          ContentType.albumArtists,
-          ContentType.genres,
-        ].contains(content);
-        if (supportsLetterBrowse &&
-            ref.watch(finampSettingsProvider.androidAutoBrowsingMode) == AndroidAutoBrowsingMode.letterFirst &&
-            mediaId.nameFilter == null) {
+        final tab = ref.watch(finampSettingsProvider.androidAutoTabs)[mediaId.tabIndex!];
+        if (tab.browseMode == AndroidAutoBrowsingMode.letters && mediaId.nameFilter == null) {
           return _getLetterNodes(mediaId);
         }
-        final sortControl = SortAndFilterController.trackSettings(content);
-        final playable = MusicScreenPlayable(
-          tab: content,
-          library: currentLibraryPlaceholder,
-          source: QueueItemSource.rawId(
-            type: QueueItemSourceType.allTracks,
-            // TODO fix source
-            name: QueueItemSourceName(type: QueueItemSourceNameType.preTranslated, pretranslatedName: "AA"),
-            id: "AA",
-          ),
-          sortConfig: ref.watch(resolveSortProvider(sortControl)).copyWithCharacterFilter(mediaId.nameFilter),
-        );
-        return await _mediaItemsFromPlayable(ref, playable);
+        if (tab.tabType == AndroidAutoTabType.recentAlbums) {
+          return _getRecentlyPlayedAlbums();
+        }
+        var playable = await ref.watch(resolveSectionProvider(tab.homeSection).future);
+        if (tab.tabType == AndroidAutoTabType.tracking) {
+          final sorted = playable as MusicScreenPlayable;
+          final sortControl = SortAndFilterController.trackSettings(sorted.tab);
+          playable = sorted.copyWith(ref.watch(resolveSortProvider(sortControl)));
+        }
+
+        if (playable case FinampSortable<FinampPlayable> sorted) {
+          playable = sorted.copyWith(sorted.sortConfig.copyWithCharacterFilter(mediaId.nameFilter));
+        }
+        // TODO add browse by letter when appropriate - also browse by page?
+        return await _mediaItemsFromPlayable(ref, playable, mediaId);
       case MediaItemType.item:
         final item = await ref.watch(itemByIdProvider(mediaId.itemId!).future);
         if (item == null) {
           return [];
         }
-        final playable = FinampPlayableDto.fromItem(item);
-        return await _mediaItemsFromPlayable(ref, playable);
+        // TODO allow configuring how artists/albums are handled?
+        // Do something smarter regarding album vs performing artist tabs?
+        // Show all types via grouping hints?
+        FinampDisplayable<FinampPlayable> playable = switch (BaseItemDtoType.fromItem(item)) {
+          BaseItemDtoType.artist => Artist(
+            item,
+            sortConfig: SortAndFilterConfiguration.defaultArtistAlbumSort,
+            type: ArtistChildType.albumsFromArtist,
+            library: currentLibraryPlaceholder,
+          ),
+          BaseItemDtoType.genre => Genre(
+            item,
+            sortConfig: SortAndFilterConfiguration.defaultArtistAlbumSort,
+            type: GenreChildType.albums,
+            library: currentLibraryPlaceholder,
+          ),
+          // We shouldn't ever be attempting to browse a track
+          _ => FinampPlayableDto.fromItem(item) as FinampDisplayable<FinampPlayable>,
+        };
+        // TODO add play/shuffle when appropriate
+        // - should this be inside fromPlayable?  what about play/shuffle options?
+        return await _mediaItemsFromPlayable(ref, playable, mediaId);
     }
   });
 
@@ -323,88 +286,78 @@ class AndroidAutoHelper {
   List<MediaItem> _getRootMenu(Ref ref) {
     final l10n = ref.watch(l10nProvider);
 
-    // Choose browsing mode hints based on user settings.
-    // - flat: respect the app-wide list/grid setting for albums; category for artists
-    // - letterFirst: list for both (letter nodes render as a list)
-    final isLetterFirst =
-        FinampSettingsHelper.finampSettings.androidAutoBrowsingMode == AndroidAutoBrowsingMode.letterFirst;
-    final isGridView = FinampSettingsHelper.finampSettings.contentViewType == ContentViewType.grid;
-
-    // 1=list, 2=grid, 4=category
-    final albumsBrowsableHint = isLetterFirst
-        ? AndroidContentStyle.listItemHintValue
-        : (isGridView ? AndroidContentStyle.gridItemHintValue : AndroidContentStyle.listItemHintValue);
-    final artistsBrowsableHint = isLetterFirst
-        ? AndroidContentStyle.listItemHintValue
-        : AndroidContentStyle.categoryGridItemHintValue; // artists always category in flat mode
-
-    return [
-      MediaItem(
-        id: MediaItemId(type: MediaItemType.tab, tabIndex: 0).toString(),
-        title: l10n.albums,
-        playable: false,
-        extras: {
-          AndroidContentStyle.browsableHintKey: albumsBrowsableHint,
-          AndroidContentStyle.playableHintKey: AndroidContentStyle.categoryGridItemHintValue,
-        },
-      ),
-      MediaItem(
-        id: MediaItemId(type: MediaItemType.tab, tabIndex: 1).toString(),
-        title: l10n.artists,
-        playable: false,
-        extras: {
-          AndroidContentStyle.browsableHintKey: artistsBrowsableHint,
-          AndroidContentStyle.playableHintKey: AndroidContentStyle.categoryGridItemHintValue,
-        },
-      ),
-      MediaItem(
-        id: MediaItemId(type: MediaItemType.tab, tabIndex: 2).toString(),
-        title: l10n.recentlyPlayedAlbums,
-        playable: false,
-      ),
-      MediaItem(
-        id: MediaItemId(type: MediaItemType.tab, tabIndex: 3).toString(),
-        title: l10n.playlists,
-        playable: false,
-      ),
-      MediaItem(
-        id: MediaItemId(type: MediaItemType.tab, tabIndex: 4).toString(),
-        title: l10n.genres,
-        playable: false,
-      ),
-      MediaItem(
-        id: MediaItemId(type: MediaItemType.tab, tabIndex: 5).toString(),
-        title: l10n.tracks,
-        playable: false,
-      ),
-    ];
+    final tabs = ref.watch(finampSettingsProvider.androidAutoTabs);
+    return tabs.mapIndexed((index, tab) {
+      if (tab.tabType == AndroidAutoTabType.tracking) {
+        final contentType = tab.contentType;
+        return MediaItem(
+          id: MediaItemId(type: MediaItemType.tab, tabIndex: index).toString(),
+          // Android auto has limited space, so just say artist instead of specifying performing/album.
+          title: contentType.isArtist ? l10n.artists : contentType.toLocalisedString(l10n),
+          playable: false,
+          extras: {AndroidContentStyle.browsableHintKey: _gridHint(contentType, tab.browseMode)},
+        );
+      } else {
+        return MediaItem(
+          id: MediaItemId(type: MediaItemType.tab, tabIndex: index).toString(),
+          title: tab.tabType == AndroidAutoTabType.recentAlbums
+              ? l10n.recentlyPlayedAlbums
+              : tab.homeSection.toLocalisedString(l10n),
+          playable: false,
+          extras: {AndroidContentStyle.browsableHintKey: _gridHint(tab.contentType, tab.browseMode)},
+        );
+      }
+    }).toList();
   }
 
-  Future<List<MediaItem>> _mediaItemsFromPlayable(Ref ref, FinampDisplayableOrPlayable playable) async {
+  Future<List<MediaItem>> _mediaItemsFromPlayable(
+    Ref ref,
+    FinampDisplayable<FinampPlayable> playable,
+    MediaItemId id,
+  ) async {
     final List<MediaItem> mediaItems = [];
     switch (playable) {
-      case FinampUnpagedDisplayable<FinampPlayableDto>():
-        final items = await ref.watch(getChildItemsProvider(item: playable).future);
-        for (final item in items) {
-          final mediaItem = await _queueService.generateMediaItem(
-            item.item,
-            itemType: MediaItemType.item,
-            isPlayable: _isPlayable,
-          );
+      case FinampDisplayable<FinampPlayableDto>():
+        // (Returned items, hasNextPage);
+        final Completer<(List<FinampDisplayableOrPlayable>, bool)> completer = Completer();
+        ProviderSubscription<PagingState<int, FinampDisplayableOrPlayable>>? driver;
+        driver = ref.listen(pagedContentProvider(playable), fireImmediately: true, (_, next) {
+          if (completer.isCompleted || next.isLoading) return;
+          final items = next.items ?? [];
+          final missingItems = (id.pageIndex ?? 0) + _pageSize - items.length;
+          if (missingItems > 0 && next.hasNextPage && next.error == null) {
+            ref.read(pagedContentProvider(playable).notifier).newPage(pageSize: missingItems);
+            return;
+          }
+          // Surface an error only when nothing is cached, so a partial page still
+          // renders rather than showing an empty library.
+          if (next.error != null && items.isEmpty) {
+            completer.completeError(next.error!);
+          } else {
+            completer.complete((items.safeSliceByLength(id.pageIndex ?? 0, _pageSize), next.hasNextPage));
+          }
+        });
+        ref.onDispose(() {
+          driver?.close();
+          if (!completer.isCompleted) {
+            completer.completeError("Loading aborted");
+          }
+        });
+        final completed = await completer.future;
+        for (final item in completed.$1.cast<FinampPlayableDto>()) {
+          final mediaItem = await _generateMediaItem(item.item, isPlayable: _isPlayable);
           mediaItems.add(mediaItem);
         }
-        return mediaItems;
-      case FinampPagedPlayable<FinampPlayableDto>():
-        // TODO reimplement paging
-        final tup = ref.watch(pagedContentProvider(playable).notifier).loadSlice(0, 100);
-        final items = (tup.$1 + (await tup.$2 ?? [])).cast<FinampPlayableDto>();
-        for (final item in items) {
-          final mediaItem = await _queueService.generateMediaItem(
-            item.item,
-            itemType: MediaItemType.item,
-            isPlayable: _isPlayable,
+        if (completed.$2) {
+          // TODO can we retrieve remaining items somehow?
+          // TODO add image for grid mode
+          mediaItems.add(
+            MediaItem(
+              id: id.copyWith(pageIndex: (id.pageIndex ?? 0) + _pageSize).toString(),
+              title: GlobalSnackbar.requireL10n.androidAutoMoreItems(99999),
+              playable: false,
+            ),
           );
-          mediaItems.add(mediaItem);
         }
         return mediaItems;
       case UnavailableHomeSectionPlayable():
@@ -417,11 +370,68 @@ class AndroidAutoHelper {
     }
   }
 
-  Future<List<MediaItem>> getMediaItems(MediaItemId itemId) async {
-    if (itemId.type == MediaItemType.tab && itemId.tabIndex == 2) {
-      return _getRecentlyPlayedItems(itemId);
+  Future<MediaItem> _generateMediaItem(
+    BaseItemDto item, {
+    bool Function({BaseItemDto? item, ContentType? contentType})? isPlayable,
+  }) async {
+    MediaItemId? itemId = MediaItemId(type: MediaItemType.item, itemId: item.id);
+
+    bool isDownloaded = false;
+    bool isItemPlayable = isPlayable?.call(item: item) ?? true;
+
+    if (item.type == "Audio") {
+      final downloadedTrack = _downloadsService.getTrackDownload(item: item);
+      isDownloaded = downloadedTrack?.file != null;
+    } else {
+      final downloadedCollection = await _downloadsService.getCollectionInfo(item: item);
+      if (downloadedCollection != null) {
+        final downloadStatus = _downloadsService.getStatus(downloadedCollection, null);
+        isDownloaded = downloadStatus != DownloadItemStatus.notNeeded;
+      }
     }
 
+    Uri? artUri = _container.read(albumImageProvider(AlbumImageRequest(item: item, maxHeight: 200, maxWidth: 200))).uri;
+
+    // use content provider for handling media art on Android
+    if (Platform.isAndroid) {
+      final packageInfo = await PackageInfo.fromPlatform();
+      // replace with placeholder art
+      if (artUri == null) {
+        final applicationSupportDirectory = await getApplicationSupportDirectory();
+        artUri = Uri(
+          scheme: "content",
+          host: packageInfo.packageName,
+          path: path_helper.join(applicationSupportDirectory.absolute.path, Assets.images.albumWhite.path),
+        );
+      } else {
+        // store the origin in fragment since it should be unused
+        artUri = Uri(
+          scheme: "content",
+          host: packageInfo.packageName,
+          path: artUri.path,
+          fragment: ["http", "https"].contains(artUri.scheme) ? artUri.origin : null,
+        );
+      }
+    }
+
+    return MediaItem(
+      id: itemId.toString(),
+      playable:
+          isItemPlayable, // this dictates whether clicking on an item will try to play it or browse it in media browsers like Android Auto
+      album: item.album,
+      artist: item.artists?.sortedBy((e) => e).join(", ") ?? item.albumArtist,
+      title: item.name ?? GlobalSnackbar.requireL10n.unknown,
+      extras: {
+        "android.media.extra.DOWNLOAD_STATUS": isDownloaded ? 2 : 0,
+        "android.media.IS_EXPLICIT": item.isExplicit ? 1 : 0,
+      },
+      // Jellyfin returns microseconds * 10 for some reason
+      duration: item.runTimeTicksDuration(),
+      artUri: artUri,
+    );
+  }
+
+  Future<List<MediaItem>> getMediaItems(MediaItemId itemId) async {
     return await _container.read(mediaItemsProvider(itemId).future);
 
     /*final items = await _container.read(getChildrenProvider(item: playable).future);
@@ -581,8 +591,6 @@ class AndroidAutoHelper {
   }
 
   Future<List<MediaItem>> searchItems(AndroidAutoSearchQuery searchQuery) async {
-    final queueService = GetIt.instance<QueueService>();
-
     try {
       final searchFuture = Future.wait([
         _searchPlaylists(searchQuery, limit: 3),
@@ -604,11 +612,7 @@ class AndroidAutoHelper {
       final List<MediaItem> mediaItems = [];
 
       for (final item in allSearchResults) {
-        final mediaItem = await queueService.generateMediaItem(
-          item,
-          itemType: MediaItemType.item,
-          isPlayable: _isPlayable,
-        );
+        final mediaItem = await _generateMediaItem(item, isPlayable: _isPlayable);
 
         // assign a group hint based on the item type, so Android Auto can group search results by type
         switch (item.type) {
@@ -1266,4 +1270,16 @@ class AndroidAutoHelper {
         tabContentType == ContentType.playlists ||
         tabContentType == ContentType.tracks;
   }
+}
+
+int _gridHint(ContentType contentType, AndroidAutoBrowsingMode viewType) {
+  final hasChildren =
+      contentType == ContentType.albums || contentType == ContentType.playlists || contentType == ContentType.tracks;
+  return switch (viewType) {
+    AndroidAutoBrowsingMode.list =>
+      hasChildren ? AndroidContentStyle.categoryListItemHintValue : AndroidContentStyle.listItemHintValue,
+    AndroidAutoBrowsingMode.letters => AndroidContentStyle.categoryListItemHintValue,
+    AndroidAutoBrowsingMode.grid =>
+      hasChildren ? AndroidContentStyle.categoryGridItemHintValue : AndroidContentStyle.gridItemHintValue,
+  };
 }

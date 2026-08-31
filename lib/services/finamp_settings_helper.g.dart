@@ -1317,6 +1317,17 @@ extension FinampSetters on FinampSettingsHelper {
     ).put("FinampSettings", finampSettingsTemp);
   }
 
+  static void setAndroidAutoTabs(List<AndroidAutoTab> newAndroidAutoTabs) {
+    FinampSettings finampSettingsTemp = FinampSettingsHelper.finampSettings;
+    if (finampSettingsTemp.androidAutoTabs == newAndroidAutoTabs) {
+      newAndroidAutoTabs = newAndroidAutoTabs.toList();
+    }
+    finampSettingsTemp.androidAutoTabs = newAndroidAutoTabs;
+    Hive.box<FinampSettings>(
+      "FinampSettings",
+    ).put("FinampSettings", finampSettingsTemp);
+  }
+
   static void setBufferDuration(Duration newBufferDuration) {
     FinampSettings finampSettingsTemp = FinampSettingsHelper.finampSettings;
     finampSettingsTemp.bufferDuration = newBufferDuration;
@@ -1763,6 +1774,10 @@ extension FinampSettingsProviderSelectors on StreamProvider<FinampSettings> {
   ) => finampSettingsProvider.select(
     (value) => value.requireValue.perTabContentViewType[tabContentType],
   );
+  ProviderListenable<List<AndroidAutoTab>> get androidAutoTabs =>
+      finampSettingsProvider.select(
+        (value) => value.requireValue.androidAutoTabs,
+      );
   ProviderListenable<DownloadProfile> get downloadTranscodingProfile =>
       finampSettingsProvider.select(
         (value) => value.requireValue.downloadTranscodingProfile,

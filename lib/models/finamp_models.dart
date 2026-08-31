@@ -318,7 +318,14 @@ class DefaultSettings {
   static const useAndroidGainEffect = true;
   static const ClientCertificate? clientCertificate = null;
   static const showQuickActionsBanner = true;
-  static const androidAutoBrowsingMode = AndroidAutoBrowsingMode.flat;
+  static final androidAutoTabs = [
+    AndroidAutoTab.tracking(ContentType.albums),
+    AndroidAutoTab.tracking(ContentType.albumArtists),
+    AndroidAutoTab.recentAlbums(),
+    AndroidAutoTab.tracking(ContentType.playlists),
+    AndroidAutoTab.tracking(ContentType.genres),
+    AndroidAutoTab.tracking(ContentType.tracks),
+  ];
 }
 
 @HiveType(typeId: 28)
@@ -467,7 +474,7 @@ class FinampSettings {
     this.clientCertificate = DefaultSettings.clientCertificate,
     this.showQuickActionsBanner = DefaultSettings.showQuickActionsBanner,
     this.perTabContentViewType = DefaultSettings.perTabContentViewType,
-    this.androidAutoBrowsingMode = DefaultSettings.androidAutoBrowsingMode,
+    required this.androidAutoTabs,
   });
 
   @HiveField(0, defaultValue: DefaultSettings.isOffline)
@@ -969,8 +976,8 @@ class FinampSettings {
   @SettingsHelperMap("tabContentType")
   Map<ContentType, ContentViewType> perTabContentViewType;
 
-  @HiveField(156, defaultValue: DefaultSettings.androidAutoBrowsingMode)
-  AndroidAutoBrowsingMode androidAutoBrowsingMode = DefaultSettings.androidAutoBrowsingMode;
+  @HiveField(156, defaultValue: <AndroidAutoTab>[])
+  List<AndroidAutoTab> androidAutoTabs;
 
   static Future<FinampSettings> create() async {
     final downloadLocation = await DownloadLocation.create(
@@ -987,6 +994,7 @@ class FinampSettings {
       gridImageSize: DefaultSettings.gridImageSize,
       homeScreenImageSize: DefaultSettings.homeScreenImageSize,
       deviceId: const Uuid().v4(),
+      androidAutoTabs: DefaultSettings.androidAutoTabs,
     );
   }
 
@@ -2851,13 +2859,13 @@ class MediaItemId {
   /// Page offset for Android Auto letter-based browsing pagination.
   int? pageIndex;
 
-  MediaItemId copyWith({String? nameFilter}) {
+  MediaItemId copyWith({String? nameFilter,int? pageIndex}) {
     return MediaItemId(
       type: type,
       itemId: itemId,
       tabIndex: tabIndex,
       nameFilter: nameFilter ?? this.nameFilter,
-      pageIndex: pageIndex,
+      pageIndex: pageIndex ?? this.pageIndex,
     );
   }
 
@@ -4048,6 +4056,8 @@ enum PreviousTracksPersistenceMode {
 }
 
 sealed class HomeScreenSectionBase {
+  const HomeScreenSectionBase();
+
   /// Human-readable version of the [HomeScreenSectionType]
   @override
   @Deprecated("Use toLocalisedString when possible")
@@ -4076,7 +4086,7 @@ class QueuesHomeSection extends HomeScreenSectionBase {
 @HiveType(typeId: 114)
 @JsonSerializable(converters: [LibraryIdConverter()], includeIfNull: false)
 class TabsHomeSection extends HomeScreenSectionBase {
-  TabsHomeSection({required this.libraryId, required this.contentType});
+  const TabsHomeSection({required this.libraryId, required this.contentType});
   @HiveField(0)
   final ContentType contentType;
   @HiveField(1)
@@ -4817,7 +4827,69 @@ class ClientCertificate {
 @HiveType(typeId: 128)
 enum AndroidAutoBrowsingMode {
   @HiveField(0)
-  flat,
+  list,
   @HiveField(1)
-  letterFirst,
+  letters,
+  @HiveField(2)
+  grid,
+}
+
+@HiveType(typeId: 129)
+class AndroidAutoTab {
+  const AndroidAutoTab({
+    required this.homeSection,
+    required this.browseMode,
+    this.tabType = AndroidAutoTabType.homeSection,
+  });
+
+  AndroidAutoTab.tracking(ContentType contentType)
+    : homeSection = HomeScreenSectionConfiguration(
+        base: TabsHomeSection(libraryId: currentLibraryPlaceholder, contentType: contentType),
+        sortConfig: SortAndFilterConfiguration.defaultSort,
+      ),
+      browseMode = switch (contentType) {
+        ContentType.albums => AndroidAutoBrowsingMode.grid,
+        ContentType.genericArtists => AndroidAutoBrowsingMode.list,
+        ContentType.playlists => AndroidAutoBrowsingMode.list,
+        ContentType.genres => AndroidAutoBrowsingMode.list,
+        // TODO browse by letter doesn't fully work for tracks - can we do something actually usefull?
+        ContentType.tracks => AndroidAutoBrowsingMode.letters,
+        ContentType.performingArtists => AndroidAutoBrowsingMode.list,
+        ContentType.albumArtists => AndroidAutoBrowsingMode.list,
+        _ => throw UnsupportedError("Invalid contentType $contentType"),
+      },
+      tabType = AndroidAutoTabType.tracking;
+
+  AndroidAutoTab.recentAlbums()
+    : homeSection = HomeScreenSectionConfiguration(
+        base: TabsHomeSection(libraryId: currentLibraryPlaceholder, contentType: ContentType.albums),
+        sortConfig: SortAndFilterConfiguration.defaultSort,
+      ),
+      browseMode = AndroidAutoBrowsingMode.grid,
+      tabType = AndroidAutoTabType.recentAlbums;
+
+  ContentType get contentType => switch (homeSection.base) {
+    QueuesHomeSection() => ContentType.home,
+    TabsHomeSection tab => tab.contentType,
+    CollectionHomeSection tab => tab.contentType,
+  };
+
+  @HiveField(0)
+  final HomeScreenSectionConfiguration homeSection;
+
+  @HiveField(1)
+  final AndroidAutoBrowsingMode browseMode;
+
+  @HiveField(2)
+  final AndroidAutoTabType tabType;
+}
+
+@HiveType(typeId: 130)
+enum AndroidAutoTabType {
+  @HiveField(0)
+  homeSection,
+  @HiveField(1)
+  tracking,
+  @HiveField(2)
+  recentAlbums,
 }
