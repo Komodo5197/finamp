@@ -450,10 +450,9 @@ Future<void> _setupPlaybackServices() async {
         // support showing search button on Android Auto as well as alternative search results on the player screen after voice search
         "android.media.browse.SEARCH_SUPPORTED": true,
         // see https://developer.android.com/reference/androidx/media/utils/MediaConstants#DESCRIPTION_EXTRAS_VALUE_CONTENT_STYLE_GRID_ITEM()
-        "android.media.browse.CONTENT_STYLE_BROWSABLE_HINT":
-            FinampSettingsHelper.finampSettings.contentViewType == ContentViewType.list ? 1 : 2,
-        "android.media.browse.CONTENT_STYLE_PLAYABLE_HINT":
-            FinampSettingsHelper.finampSettings.contentViewType == ContentViewType.list ? 1 : 2,
+        // TODO document this better
+        "android.media.browse.CONTENT_STYLE_BROWSABLE_HINT": 1,
+        "android.media.browse.CONTENT_STYLE_PLAYABLE_HINT": 2,
       },
     ),
     cacheManager: StubImageCache(),

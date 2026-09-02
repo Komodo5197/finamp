@@ -345,7 +345,9 @@ Future<List<BaseItemDto>?> loadHomeSectionItems(
     //    sortAndFilterConfig.filters.any((filter) => filter.type == ItemFilterType.isFavorite))
     //     ? true
     //    : null,
-    nameStartsWith: letterFilter?.extraString,
+    // This is the filter setup jellyfin web uses for the '#' bracket
+    nameStartsWith: letterFilter?.extraString == "#" ? null : letterFilter?.extraString,
+    nameLessThan: letterFilter?.extraString == "#" ? "A" : null,
     artistType: artistType,
     genreFilter: genreFilter?.extraBaseItem.id,
   );

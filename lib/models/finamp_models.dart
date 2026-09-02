@@ -2859,7 +2859,7 @@ class MediaItemId {
   /// Page offset for Android Auto letter-based browsing pagination.
   int? pageIndex;
 
-  MediaItemId copyWith({String? nameFilter,int? pageIndex}) {
+  MediaItemId copyWith({String? nameFilter, int? pageIndex}) {
     return MediaItemId(
       type: type,
       itemId: itemId,
@@ -2868,6 +2868,8 @@ class MediaItemId {
       pageIndex: pageIndex ?? this.pageIndex,
     );
   }
+
+  static const letterRoot = "?";
 
   factory MediaItemId.fromJson(Map<String, dynamic> json) => _$MediaItemIdFromJson(json);
 
