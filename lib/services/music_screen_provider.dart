@@ -95,6 +95,8 @@ class PagedContent extends _$PagedContent {
         musicRequest = request.getMusicScreenRequest();
       case MusicScreenPlayable<FinampPlayableDto>():
         musicRequest = request;
+      case Folder():
+        musicRequest = request.getMusicScreenRequest();
     }
 
     int offset = 0;
@@ -316,6 +318,20 @@ Future<List<BaseItemDto>?> loadHomeSectionItems(
 
   final artistType = artistFilter != null ? ref.watch(finampSettingsProvider.defaultArtistType) : tabArtistType;
 
+  if (request.tab == ContentType.folders) {
+    final out = await jellyfinApiHelper.getItems(
+      parentItem: BaseItemDto(id: library!.id),
+      recursive: false,
+      startIndex: startIndex,
+      fields: "${jellyfinApiHelper.defaultFields},Path",
+      limit: limit,
+      sortBy: request.sortConfig.sortBy.jellyfinName(request.tab),
+      sortOrder: request.sortConfig.sortOrder.toString(),
+    );
+    print("ZZZZZZZZZZZZZZzz ${out?.map((x) => x.toJson()).toList()}");
+    return out;
+  }
+
   return jellyfinApiHelper.getItems(
     libraryFilter: library?.id,
     parentItem: request.tab == ContentType.playlists ? null : (artistFilter?.extraBaseItem ?? library),
@@ -378,6 +394,11 @@ Future<List<BaseItemDto>?> loadHomeSectionItemsOffline({
     }
   } else {
     libraryId = request.library as BaseItemId;
+  }
+
+  if (request.tab == ContentType.folders) {
+    // Browsing by folder not supported while offline
+    return [];
   }
 
   //FIXME this seems to also return metadata-only albums which don't have any downloaded children
