@@ -14,6 +14,48 @@ flutter doctor -v
 This will list out all components used for Flutter development, and if they are installed. This should include either Android or iOS development (depending on your platform), as well as any desktop platform you want to target.  
 You can ignore the Chrome/Web component, since Finamp is not a web app.
 
+### NixOS
+
+The project includes a `flake.nix` file that can help you install Flutter and Rust dependencies. The recommended way of using it is to
+use `nix develop`, which allows rustup for Discord RPC dependency. Also, there's `nix develop .#fenix` which stubs rustup with [fenix](https://github.com/nix-community/fenix/), but it is a hack.
+
+To get the application running on NixOS once you are in the development shell:
+
+- `flutter build linux` - generates the build files in `./build/linux/x64/release/bundle` where the `lib` folder will have all the dynamic libraries.
+- `cd ./build/linux/x64/release/bundle/lib` - flutter cannot find the dynamic libraries by default. Probably works only with this CWD because the fallback is CWD.
+- `../finamp` - start the application.  
+  Or use convenient `(cd build/linux/x64/release/bundle/lib && ../finamp)` command to cd in subshell
+
+It is possible those actions will not lead to application start in JetBrains IDEs. Then, the actual run should be done outside JetBrains IDE using the same flake.
+
+The normally-used `flutter run ...` command does not seem to launch application on NixOS at this time but could be used to run on Android (not tested).
+
+Note that code generation fails since 21baadbaf6852d34d7d12725a293c359c05cf20b due to unknown issue in nixpkgs. Applying this patch helps:
+
+```diff
+diff --git a/lib/builders/finamp_settings_builder.dart b/lib/builders/finamp_settings_builder.dart
+--- a/lib/builders/finamp_settings_builder.dart (revision 66736f47c5d084463591dd74189c46123f4144ff)
++++ b/lib/builders/finamp_settings_builder.dart (date 1768146068892)
+@@ -129,13 +129,6 @@
+   }
+ 
+   static String _typeName(DartType type) {
+-    var typeArg = type.element!.displayName;
+-    if (type is ParameterizedType && type.typeArguments.isNotEmpty) {
+-      typeArg = "$typeArg<${type.typeArguments.map((x) => _typeName(x)).join(",")}>";
+-    }
+-    if (type.nullabilitySuffix == NullabilitySuffix.question) {
+-      typeArg = "$typeArg?";
+-    }
+-    return typeArg;
++    return type.getDisplayString();
+   }
+ }
+
+```
+
+After that, you need to manually update `InvalidType` in generated code to represent actual types, which most of the time is done by reverting affected lines since there are currently only two types (`Color` and `Locale`) that trigger failure. This patch is not to be committed to tree due to [`getDisplayString` not being intended for code generation](https://github.com/dart-lang/sdk/issues/52455#issuecomment-1559972986), and so manual check of generated code is required.
+
 ### Building for Android
 
 You can build debug builds for Android right-away, but you will get an error if you try to build a release build (which is the default type).  
@@ -26,7 +68,14 @@ This also means that you can keep using your regular install of Finamp (from the
 If you try to install a release build you built yourself (with your signing key) on top of a release build you downloaded from the Play Store or GitHub, Android will prevent you from doing so and show a generic error message. The only solution here is to uninstall the existing version, and then install your build. Note that this will delete any logins, settings and downloads that you had configured.  
 This generally shouldn't be needed, since debug builds works fine for daily usage, even though they are a bit less performant.
 
+### Developing on Windows
+
+With recent Flutter updates, there have been some issue with caches not being closed when trying to build *on* Windows (no matter which platform).  
+If you run into this (something about "unclosed caches"), then check if your pub.dev cache is on the same drive (e.g. `C:`, `D:`) as your Finamp directory (the one you cloned via Git). If they aren't on the same drive, you'll have to move either your Finamp directory, or your pub.dev package cache. For the latter, simply clear the old cache via `flutter pub cache clean`, and then point the cache to a new location (<https://dart.dev/tools/pub/environment-variables>).  
+This should fix the issue.
+
 ### Developing on an Android Device without Android Studio on linux (not recommended)
+
 1. You need the following packages  
     *you may need to find out the equivalents for your distro, these are for Arch*  
     `android-sdk android-sdk-build-tools android-sdk-cmdline-tools-latest android-platform android-sdk-platform-tools`
@@ -38,8 +87,8 @@ This generally shouldn't be needed, since debug builds works fine for daily usag
 6. Find your device  
     `flutter devices`
 7. Run on device  
-    `flutter run -d <device>` eg. for google pixel phones `flutter run -d pixel`   
-8. Go back to develop on linux   
+    `flutter run -d <device>` eg. for google pixel phones `flutter run -d pixel`
+8. Go back to develop on linux
     `flutter run -d linux`
 
 ### Code Generation (The Arcane Arts)
@@ -63,6 +112,18 @@ If you can't launch Finamp (e.g. with `flutter run`) after generating code you m
 
 - Modifying a class that is returned by Jellyfin (such as the classes in `lib/models/jellyfin_models.dart`)
 - Adding fields (annotated with `@HiveField`) to a database class (annotated with `@HiveType`)
+
+### Native Splash Screens
+
+Native splash screens are generated from `flutter_native_splash.yaml`.
+
+Run:
+
+```bash
+dart run flutter_native_splash:create --path=flutter_native_splash.yaml
+```
+
+Rerun this after changing splash colors, splash icon assets, or light/dark splash behavior. This updates the generated iOS and Android native splash resources.
 
 >[!WARNING]
 > **If you don't rebuild generated files**, you will encounter some issues:
@@ -96,7 +157,9 @@ As mentioned above, Finamp uses Hive for most data storage needs. If you're doin
 When creating new types, note that you'll also have to register an adapter in `main.dart`. After code generation, there should be a class called `[YourType]Adapter`, which you can initialize in `setupHive`.
 
 ## Project Structure
+
 Here is a short description on the paths you'll most likely come across
+
 ```
 lib/                                -- the codebase also known as src in other projects
     components/                     -- Contains elements used by screens
@@ -106,20 +169,118 @@ lib/                                -- the codebase also known as src in other p
         screens/                    -- All the "pages", "screens", "views" what ever you want to call them
         services/                   -- Things that run in the background, kinda like backend
 ```
+
 ## Developing
+
+*Remember to format your changes before pushing (ideally in a **separate commit**), by running `flutter gen-l10n` or the "Generate Localizations" command in VS Code*
 
 ### Extending the Jellyfin API
 
-1. Figure out the endpoint you need. You can use https://api.jellyfin.org for this, for example
+1. Figure out the endpoint you need. You can use <https://api.jellyfin.org> for this, for example
 2. Create a new matching endpoint in `jellyfin_api.dart`. Just copy-paste the needed annotations from other similar endpoints.
 3. Run code-generation (`dart run build_runner build --delete-conflicting-outputs`) to generate actual code based on the endpoint annotations
 4. Create a new method for interacting with the endpoint in `jellyfin_api_helper.dart`. Again, just copy-paste what you need.
 5. Call the new method through `JellyfinApiHelper` to make your request
 
+### Adding a New Setting
+
+1. Find a setting that has a similar UI (e.g. toggle, dropdown) as what you're trying to add
+2. Find the code for that setting on one of the settings screens, and check what kind of data structure it uses (defined in `finamp_models.dart`)
+3. Add a new property for the setting you're trying to add, with the right data structure. That [can] involve, in that order: [create a new enum or class at the end of the file], [assign new HiveIDs and field IDs], add a new default value for the setting (`DefaultSettings` class), add a new property to `FinampSettings` (remember to increment the `HiveField` annotation), and add an argument for the new property to the `FinampSettings` constructor
+4. Then run code generation via `dart run build_runner build --delete-conflicting-outputs`
+5. Now duplicate the code for the new setting in the appropriate settings screen file, and update the settings property it references to match your newly added setting
+6. Now add new translation strings in `app_en.arb` at the bottom, then generate the new localizations via `flutter gen-l10n` (see "Adding i18n strings")
+7. Use the new translation tokens in your new settings' code, replacing the old translation tokens
+8. Format everything via `dart format .`
+
 ### Adding i18n strings
 
-1. In [app_en.arb](lib/l10n/app_en.arb), add default english string as well as string description following examples in the file
+1. In [app_en.arb](lib/l10n/app_en.arb), add default English string as well as string description following examples in the file
 2. Run `flutter gen-l10n` or VSCode command "Generate Localizations" if you have Flutter plugin installed
+
+### Playback Reporting
+
+There are several aspects to playback reporting in Finamp. The main goal is to always let the server know what the user is listening to, including when they *started* and when they *stopped*. This is handled in [`playback_history_service.dart`](lib/services/playback_history_service.dart), by listening to the player state (among others) and invoking various Jellyfin endpoints in response. There are 3 endpoints: starting, stopping, and a generic "progress" endpoint that just updates the server's state without creating a start or stop event.  
+The start and stop events are further used by server plugins such as ["Playback Reporting"](https://github.com/jellyfin/jellyfin-plugin-playbackreporting) or ["Last.fm"](https://github.com/jesseward/jellyfin-plugin-lastfm) to keep track of users' listening activity.
+Playback reporting is also used as a way to tell the server about the user's current playback queue, so that it can be shown in other Jellyfin clients when they are controlling Finamp via the "Play On" feature. That's why when a Play On session is established, we increase the frequency of playback updates.
+Finally, playback reporting is also used (read: required) to tell the server about the transcoding status, so that is actually shows up correctly on the admin dashboard (see below).  
+
+Finamp keeps track of any plays that couldn't be sent to the server (due to errors or because offline mode was active) in a text file which can be exported via the "share" icon on the [🔗 Playback History Screen](https://intradeus.github.io/http-protocol-redirector?r=finamp://internal/playbackhistory).  
+The playback history itself currently only contains plays since the app was last launched and is deleted when the app is closed.
+
+#### Showing Transcode Status on the Admin Dashboard
+
+Getting the server to show the actual transcoding status on the admin dashboard isn't trivial. It requires 3 conditions:
+
+1. Requesting a (transcoded) stream from the server
+   - Either endpoint works, `/Audio/{itemId}/main.m3u8` and `/{streamId}/stream.{container}` (the latter can be returned by the server)
+2. Reporting playback of the exact media that was requested (matching `BaseItemDto` IDs)
+3. Using a *consistent* `PlaySessionId` across the two requests above
+
+Importantly, while the `PlaySessionId` *can* be "properly" obtained from the server by using the [`POST /Items/{itemId}/PlaybackInfo`](https://api.jellyfin.org/#tag/MediaInfo/operation/GetPostedPlaybackInfo) endpoint, it currently doesn't have to be (as of Jellyfin 10.10.13, and 10.11-RC3), meaning you can just generate a random ID (UUID v4 works) and use that. It just has to be consistent.  
+The server team mentioned that in the future this ID might be used to authenticate media requests, meaning you'll have to obtain the ID before you can request a media stream, but this will probably require some API changes (as explained below).
+
+The above steps are all that's needed to get the dashboard to show "Transcoding" instead of the default "Direct Play". However, if you want to show *reasons* for transcoding, and/or make use of Jellyfin's ability to support *automatic* transcoding based on device capabilities, there are stricter requirements.  
+Firstly, you'll *have* to use the [`POST /Items/{itemId}/PlaybackInfo`](https://api.jellyfin.org/#tag/MediaInfo/operation/GetPostedPlaybackInfo) endpoint in order to let the server know which codecs, containers, bitrates, etc. your device supports (this data could vary depending on client settings, e.g. the maximum bitrate could be a setting. Jellyfin will probably also default to the Jellyfin user's default settings here.). This endpoint will return information about which playback method is best suited (based on the media formats and the device capabilities), a pre-build endpoint for streaming the media with the recommended settings, IDs, and keys (the `/{streamId}/stream.{container}` URL mentioned earlier), and the `PlaySessionId` which is used to identify the playback session.  
+What this means is that for each and every track you want to possibly play transcoded, you'll have to make a request to the server. There currently is no batching or reusing if you want to properly show the transcoding status and reasons. Possibly because the server needs to decide the transcoding settings for each item individually, since they could all have different formats and bit rates.  
+But since **making one request for each track that is queued up is simply not feasible in Finamp** at the moment (takes way to long, and we need to make the request *before* we can add the track to the queue), we have opted to simply use a random `playSessionId` and not support the transcode reasons and/or automatic transcoding features. Finamp stores the ID in the `playSessionId` field of the `MediaItem`'s `extras` map.  
+Notably, since we already have the full `BaseItemDto`s and additional metadata for each track, we could simply build client-side automatic transcoding. This would be needed anyway for considering network connectivity and such, so we're not losing much here.  
+
+Should the API for this improve in the future, for example by allowing us to submit the supported codecs and bitrate limits to an endpoint like [`/Sessions/Capabilities/Full`](https://api.jellyfin.org/#tag/Session/operation/PostFullCapabilities) (that part is already possible) and then getting the corresponding `PlaySessionId`s and transcode URLs via the regular `BaseItemDto`, then we could think about doing this the proper way. But until then we'll most likely handle the ID generation and transcoding settings client-side.
+
+### Android Debug Build stuck in 'assembleDebug'
+
+1. `cd android`
+2. `./gradlew clean`
+3. `cd ..`
+4. `flutter run -d <phone>`
+
+Now you need to wait a bit, but it'll finish :)
+
+### CarPlay Development (iOS)
+
+CarPlay uses the `flutter_carplay` plugin. To test CarPlay in the simulator:
+
+1. Build and run the app on an iOS simulator
+2. In the Simulator menu: **I/O > External Displays > CarPlay**
+
+Note: CarPlay can only be tested on the simulator with the included entitlements. Testing on real hardware requires a CarPlay entitlement from Apple, which must be requested separately and is not included in this repository.
+
+#### CarPlay Not Appearing in Simulator
+
+If Finamp doesn't appear in the CarPlay display after enabling it, the most common cause is corruption in the Xcode project file from repeated `pod install` runs. This can break entitlement embedding for simulator builds.
+
+**Fix:**
+
+```bash
+# Restore project file to committed state
+git checkout -- ios/Runner.xcodeproj/project.pbxproj
+
+# Clean rebuild
+flutter clean
+flutter pub get
+cd ios && pod install && cd ..
+flutter build ios --simulator
+```
+
+Then restart the simulator and re-enable CarPlay via **I/O > External Displays > CarPlay**.
+
+### Add dbus message
+
+1. Open `lib/services/dbus_manager.dart`
+2. Add another `else if (call.interface == 'com.unicornsonlsd.Finamp' && call.name == 'YOUR FUNCTION NAME')`
+3. Profit
+
+### Add global keyboard shortcuts
+
+Finamp uses Flutter `Shortcuts`/`Actions` under `lib/components/Shortcuts/`.
+
+1. Create a new file (Example: `lib/components/Shortcuts/navigation_shortcuts.dart`).
+2. Create intents and get actions function (see example at `music_control_shortcuts.dart`).
+3. Define shortcuts and add actions to `global_shortcut_manager.dart`.
+
+Note:
+Handle `consumesKey` and `invoke` in the `CallbackAction` class for cases where text input is happening in a TextField for potentially conflicting shortcuts.
 
 ## The Redesign
 

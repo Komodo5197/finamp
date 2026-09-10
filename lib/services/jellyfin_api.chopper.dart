@@ -57,7 +57,7 @@ final class _$JellyfinApi extends JellyfinApi {
   @override
   Future<dynamic> initiateQuickConnect() async {
     final Uri $url = Uri.parse('/QuickConnect/Initiate');
-    final Request $request = Request('GET', $url, client.baseUrl);
+    final Request $request = Request('POST', $url, client.baseUrl);
     final Response $response = await client.send<dynamic, dynamic>(
       $request,
       requestConverter: JsonConverter.requestFactory,
@@ -159,6 +159,49 @@ final class _$JellyfinApi extends JellyfinApi {
   }
 
   @override
+  Future<Response<dynamic>> setItemPrimaryImage({
+    String contentType = "image/jpeg",
+    required BaseItemId itemId,
+    required String base64Image,
+  }) {
+    final Uri $url = Uri.parse('/Items/${itemId}/Images/Primary');
+    final Map<String, String> $headers = {'Content-Type': contentType};
+    final $body = base64Image;
+    final Request $request = Request(
+      'POST',
+      $url,
+      client.baseUrl,
+      body: $body,
+      headers: $headers,
+    );
+    return client.send<dynamic, dynamic>($request);
+  }
+
+  @override
+  Future<dynamic> getUser() async {
+    final Uri $url = Uri.parse('/Users/Me');
+    final Request $request = Request('GET', $url, client.baseUrl);
+    final Response $response = await client.send<dynamic, dynamic>(
+      $request,
+      requestConverter: JsonConverter.requestFactory,
+      responseConverter: JsonConverter.responseFactory,
+    );
+    return $response.bodyOrThrow;
+  }
+
+  @override
+  Future<dynamic> getUserById(String id) async {
+    final Uri $url = Uri.parse('/Users/${id}');
+    final Request $request = Request('GET', $url, client.baseUrl);
+    final Response $response = await client.send<dynamic, dynamic>(
+      $request,
+      requestConverter: JsonConverter.requestFactory,
+      responseConverter: JsonConverter.responseFactory,
+    );
+    return $response.bodyOrThrow;
+  }
+
+  @override
   Future<dynamic> getViews(String id) async {
     final Uri $url = Uri.parse('/Users/${id}/Views');
     final Request $request = Request('GET', $url, client.baseUrl);
@@ -204,6 +247,9 @@ final class _$JellyfinApi extends JellyfinApi {
     int? startIndex,
     int? limit,
     bool? collapseMultiDiscAlbums,
+    String? nameStartsWith,
+    String? nameStartsWithOrGreater,
+    String? nameLessThan,
   }) async {
     final Uri $url = Uri.parse('/Users/${userId}/Items');
     final Map<String, dynamic> $params = <String, dynamic>{
@@ -226,6 +272,9 @@ final class _$JellyfinApi extends JellyfinApi {
       'StartIndex': startIndex,
       'Limit': limit,
       'CollapseBoxSetItems': collapseMultiDiscAlbums,
+      'NameStartsWith': nameStartsWith,
+      'NameStartsWithOrGreater': nameStartsWithOrGreater,
+      'NameLessThan': nameLessThan,
     };
     final Request $request = Request(
       'GET',
@@ -277,11 +326,44 @@ final class _$JellyfinApi extends JellyfinApi {
     required BaseItemId id,
     required String userId,
     required int limit,
+    bool? enableImages = true,
+    List<String>? enableImageTypes = const ["Primary", "Disc", "Thumb", "Art"],
   }) async {
     final Uri $url = Uri.parse('/Items/${id}/InstantMix');
     final Map<String, dynamic> $params = <String, dynamic>{
       'userId': userId,
       'limit': limit,
+      'enableImages': enableImages,
+      'enableImageTypes': enableImageTypes,
+    };
+    final Request $request = Request(
+      'GET',
+      $url,
+      client.baseUrl,
+      parameters: $params,
+    );
+    final Response $response = await client.send<dynamic, dynamic>(
+      $request,
+      requestConverter: JsonConverter.requestFactory,
+      responseConverter: JsonConverter.responseFactory,
+    );
+    return $response.bodyOrThrow;
+  }
+
+  @override
+  Future<dynamic> getSimilarAlbums({
+    required BaseItemId id,
+    String? userId,
+    List<String>? excludeArtistIds,
+    int? limit,
+    List<String>? fields,
+  }) async {
+    final Uri $url = Uri.parse('/Albums/${id}/Similar');
+    final Map<String, dynamic> $params = <String, dynamic>{
+      'userId': userId,
+      'excludeArtistIds': excludeArtistIds,
+      'limit': limit,
+      'fields': fields,
     };
     final Request $request = Request(
       'GET',
@@ -313,6 +395,36 @@ final class _$JellyfinApi extends JellyfinApi {
   }
 
   @override
+  Future<dynamic> getPlaylistUser({
+    required String userId,
+    required BaseItemId playlistId,
+  }) async {
+    final Uri $url = Uri.parse('/Playlists/${playlistId}/Users/${userId}');
+    final Request $request = Request('GET', $url, client.baseUrl);
+    final Response $response = await client.send<dynamic, dynamic>(
+      $request,
+      requestConverter: JsonConverter.requestFactory,
+      responseConverter: JsonConverter.responseFactory,
+    );
+    return $response.bodyOrThrow;
+  }
+
+  @override
+  Future<dynamic> getPlaylistUsers({
+    required String userId,
+    required BaseItemId playlistId,
+  }) async {
+    final Uri $url = Uri.parse('/Playlists/${playlistId}/Users');
+    final Request $request = Request('GET', $url, client.baseUrl);
+    final Response $response = await client.send<dynamic, dynamic>(
+      $request,
+      requestConverter: JsonConverter.requestFactory,
+      responseConverter: JsonConverter.responseFactory,
+    );
+    return $response.bodyOrThrow;
+  }
+
+  @override
   Future<dynamic> getPlaybackInfo({
     required BaseItemId id,
     required String userId,
@@ -325,6 +437,22 @@ final class _$JellyfinApi extends JellyfinApi {
       client.baseUrl,
       parameters: $params,
     );
+    final Response $response = await client.send<dynamic, dynamic>(
+      $request,
+      requestConverter: JsonConverter.requestFactory,
+      responseConverter: JsonConverter.responseFactory,
+    );
+    return $response.bodyOrThrow;
+  }
+
+  @override
+  Future<dynamic> submitPlaybackInfo({
+    required BaseItemId id,
+    required PlaybackInfoRequest playbackInfoRequest,
+  }) async {
+    final Uri $url = Uri.parse('/Items/${id}/PlaybackInfo');
+    final $body = playbackInfoRequest;
+    final Request $request = Request('POST', $url, client.baseUrl, body: $body);
     final Response $response = await client.send<dynamic, dynamic>(
       $request,
       requestConverter: JsonConverter.requestFactory,
@@ -557,6 +685,7 @@ final class _$JellyfinApi extends JellyfinApi {
     int? startIndex,
     int? limit,
     bool? isFavorite,
+    String? nameStartsWith,
   }) async {
     final Uri $url = Uri.parse('/Artists');
     final Map<String, dynamic> $params = <String, dynamic>{
@@ -570,6 +699,7 @@ final class _$JellyfinApi extends JellyfinApi {
       'StartIndex': startIndex,
       'Limit': limit,
       'isFavorite': isFavorite,
+      'NameStartsWith': nameStartsWith,
     };
     final Request $request = Request(
       'GET',
@@ -601,6 +731,7 @@ final class _$JellyfinApi extends JellyfinApi {
     int? limit,
     required String userId,
     bool? isFavorite,
+    String? nameStartsWith,
   }) async {
     final Uri $url = Uri.parse('/Artists/AlbumArtists');
     final Map<String, dynamic> $params = <String, dynamic>{
@@ -618,6 +749,7 @@ final class _$JellyfinApi extends JellyfinApi {
       'Limit': limit,
       'UserId': userId,
       'isFavorite': isFavorite,
+      'NameStartsWith': nameStartsWith,
     };
     final Request $request = Request(
       'GET',

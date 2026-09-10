@@ -4,6 +4,8 @@ import 'package:finamp/services/datetime_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 
+import '../../extensions/localizations.dart';
+import '../../models/music_models.dart';
 import '../../services/playback_history_service.dart';
 import '../padded_custom_scrollview.dart';
 
@@ -31,10 +33,23 @@ class PlaybackHistoryList extends StatelessWidget {
                   final actualIndex = group.value.length - index - 1;
 
                   final historyItem = TrackListTile(
+                    key: ValueKey(group.value[actualIndex].item.id),
                     index: actualIndex,
-                    item: group.value[actualIndex].item.baseItem!,
-                    isShownInSearchOrHistory: true,
+                    item: group.value[actualIndex].item.baseItem,
                     highlightCurrentTrack: groupIndex == 0 && index == 0, // only highlight first track
+                    playbackProgress: group.value[actualIndex].playPercentage,
+                    // TODO better queue source
+                    parentPlayable: PrecalculatedPlayable(
+                      source: QueueItemSource.rawId(
+                        type: QueueItemSourceType.unknown,
+                        name: QueueItemSourceName(
+                          type: QueueItemSourceNameType.preTranslated,
+                          pretranslatedName: context.l10n.playbackHistory,
+                        ),
+                        id: "playback-history",
+                      ),
+                      tracks: group.value.map((x) => x.item.baseItem).toList().reversed.toList(),
+                    ),
                   );
 
                   return index == 0

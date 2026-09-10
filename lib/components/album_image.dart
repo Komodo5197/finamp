@@ -1,15 +1,10 @@
-import 'dart:io';
-import 'dart:math';
 import 'dart:ui';
 
-import 'package:finamp/components/PlayerScreen/player_split_screen_scaffold.dart';
-import 'package:finamp/models/finamp_models.dart';
-import 'package:finamp/services/finamp_settings_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_blurhash/flutter_blurhash.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_tabler_icons/flutter_tabler_icons.dart';
-import 'package:octo_image/octo_image.dart';
+import 'package:octo_image/src/image/fade_widget.dart';
 import 'package:uuid/v4.dart';
 
 import '../models/jellyfin_models.dart';
@@ -21,12 +16,13 @@ typedef ImageProviderCallback = void Function(ImageProvider theme);
 /// This widget provides the default look for album images throughout Finamp -
 /// Aspect ratio 1 with a circular border radius of 4. If you don't want these
 /// customisations, use [BareAlbumImage] or get an [ImageProvider] directly
-/// through [AlbumImageProvider.init].
+/// through [AlbumImageInfo.init].
 class AlbumImage extends ConsumerStatefulWidget {
   const AlbumImage({
     super.key,
     this.item,
     this.imageListenable,
+    this.sizePreset,
     this.borderRadius,
     this.placeholderBuilder,
     this.disabled = false,
@@ -39,7 +35,9 @@ class AlbumImage extends ConsumerStatefulWidget {
   /// The item to get an image for.
   final BaseItemDto? item;
 
-  final ProviderListenable<ThemeImage>? imageListenable;
+  final ProviderListenable<FinampImage>? imageListenable;
+
+  final int? sizePreset;
 
   final BorderRadius? borderRadius;
 
@@ -67,6 +65,18 @@ class AlbumImage extends ConsumerStatefulWidget {
 
 class _AlbumImageState extends ConsumerState<AlbumImage> {
   final String zoomID = UuidV4().generate();
+  int? currentPhysicalWidth;
+  int? currentPhysicalHeight;
+
+  @override
+  void didUpdateWidget(AlbumImage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // reset cached image size
+    if (widget.sizePreset != oldWidget.sizePreset) {
+      currentPhysicalWidth = null;
+      currentPhysicalHeight = null;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -83,108 +93,7 @@ class _AlbumImageState extends ConsumerState<AlbumImage> {
       );
     }
 
-    final content = ClipRRect(
-      borderRadius: borderRadius,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          var listenable = widget.imageListenable;
-          bool imageScaled = false;
-          if (listenable == null) {
-            // If the current themeing context has a usable image for this item,
-            // use that instead of generating a new request
-            if (ref.watch(
-              localThemeInfoProvider.select(
-                (request) => (request?.largeThemeImage ?? false) && request?.item == widget.item,
-              ),
-            )) {
-              listenable = localImageProvider;
-            } else {
-              int? physicalWidth;
-              int? physicalHeight;
-              if (widget.autoScale) {
-                imageScaled = true;
-                // LayoutBuilder (and other pixel-related stuff in Flutter) returns logical pixels instead of physical pixels.
-                // While this is great for doing layout stuff, we want to get images that are the right size in pixels.
-                // Logical pixels aren't the same as the physical pixels on the device, they're quite a bit bigger.
-                // If we use logical pixels for the image request, we'll get a smaller image than we want.
-                // Because of this, we convert the logical pixels to physical pixels by multiplying by the device's DPI.
-                final MediaQueryData mediaQuery = MediaQuery.of(context);
-                physicalWidth = (constraints.maxWidth * mediaQuery.devicePixelRatio).toInt();
-                physicalHeight = (constraints.maxHeight * mediaQuery.devicePixelRatio).toInt();
-                // If using grid music screen view without fixed size tiles, and if the view is resizable due
-                // to being on desktop and using split screen, then clamp album size to reduce server requests when resizing.
-                if ((!(Platform.isIOS || Platform.isAndroid) || usingPlayerSplitScreen) &&
-                    !FinampSettingsHelper.finampSettings.useFixedSizeGridTiles &&
-                    FinampSettingsHelper.finampSettings.contentViewType == ContentViewType.grid) {
-                  physicalWidth = exp((log(physicalWidth) * 3).ceil() / 3).toInt();
-                  physicalHeight = exp((log(physicalHeight) * 3).ceil() / 3).toInt();
-                }
-              }
-
-              listenable = albumImageProvider(
-                AlbumImageRequest(item: widget.item!, maxWidth: physicalWidth, maxHeight: physicalHeight),
-              ).select((value) => ThemeImage(value, widget.item?.blurHash));
-            }
-          }
-
-          var image = Container(
-            decoration: widget.decoration,
-            child: BareAlbumImage(
-              imageListenable: listenable,
-              placeholderBuilder: widget.placeholderBuilder,
-              onZoomRoute: widget.onZoomRoute,
-            ),
-          );
-
-          if (widget.tapToZoom) {
-            final largeImage = AlbumImage(
-              item: imageScaled ? widget.item : null,
-              imageListenable: imageScaled ? null : listenable,
-              borderRadius: BorderRadius.zero,
-              placeholderBuilder: (_) => image,
-              autoScale: false,
-              tapToZoom: false,
-              onZoomRoute: true,
-            );
-            // Show album as clickable on desktop
-            return MouseRegion(
-              cursor: SystemMouseCursors.click,
-              child: GestureDetector(
-                onTap: () => Navigator.of(context).push(
-                  PageRouteBuilder<_ZoomedImage>(
-                    opaque: false,
-                    barrierDismissible: true,
-                    transitionDuration: MediaQuery.of(context).disableAnimations
-                        ? Duration.zero
-                        : const Duration(milliseconds: 500),
-                    pageBuilder: (BuildContext context, Animation<double> animation1, Animation<double> animation2) {
-                      return _ZoomedImage(albumImage: largeImage, id: zoomID);
-                    },
-                  ),
-                ),
-                child: Hero(
-                  tag: zoomID,
-                  createRectTween: (begin, end) => RectTween(begin: begin, end: end),
-                  child: image,
-                  placeholderBuilder: (context, heroSize, child) => image,
-                  flightShuttleBuilder: (_, __, ___, ____, _____) => largeImage,
-                ),
-              ),
-            );
-          }
-
-          return widget.disabled
-              ? Opacity(
-                  opacity: 0.75,
-                  child: ColorFiltered(
-                    colorFilter: const ColorFilter.mode(Colors.black, BlendMode.color),
-                    child: image,
-                  ),
-                )
-              : image;
-        },
-      ),
-    );
+    final content = ClipRRect(borderRadius: borderRadius, child: _buildContent());
 
     return Semantics(
       // label: item?.name != null ? AppLocalizations.of(context)!.artworkTooltip(item!.name!) : AppLocalizations.of(context)!.artwork, // removed to reduce screen reader verbosity
@@ -192,23 +101,118 @@ class _AlbumImageState extends ConsumerState<AlbumImage> {
       child: AspectRatio(aspectRatio: 1.0, child: widget.onZoomRoute ? content : Align(child: content)),
     );
   }
+
+  Widget _buildContent() {
+    final listenable = widget.imageListenable;
+
+    if (listenable == null) {
+      // If the current themeing context has a usable image for this item,
+      // use that instead of generating a new request
+      if (ref.watch(
+        localImageProvider.select((localImage) => localImage.fullQuality && localImage.item == widget.item),
+      )) {
+        return _buildFromListenable(false, localImageProvider);
+      } else {
+        if (widget.autoScale) {
+          return LayoutBuilder(
+            builder: (context, constraints) {
+              // LayoutBuilder (and other pixel-related stuff in Flutter) returns logical pixels instead of physical pixels.
+              // While this is great for doing layout stuff, we want to get images that are the right size in pixels.
+              // Logical pixels aren't the same as the physical pixels on the device, they're quite a bit bigger.
+              // If we use logical pixels for the image request, we'll get a smaller image than we want.
+              // Because of this, we convert the logical pixels to physical pixels by multiplying by the device's DPI.
+              final pixelRatio = MediaQuery.devicePixelRatioOf(context);
+              int physicalWidth = currentPhysicalWidth ?? (constraints.maxWidth * pixelRatio).toInt();
+              int physicalHeight = currentPhysicalHeight ?? (constraints.maxHeight * pixelRatio).toInt();
+              if (widget.sizePreset != null) {
+                currentPhysicalHeight = physicalHeight;
+                currentPhysicalWidth = physicalWidth;
+              }
+              return _buildFromListenable(
+                true,
+                albumImageProvider(
+                  AlbumImageRequest(item: widget.item!, maxWidth: physicalWidth, maxHeight: physicalHeight),
+                ),
+              );
+            },
+          );
+        } else {
+          return _buildFromListenable(false, albumImageProvider(AlbumImageRequest(item: widget.item!)));
+        }
+      }
+    } else {
+      return _buildFromListenable(false, listenable);
+    }
+  }
+
+  Widget _buildFromListenable(bool imageScaled, ProviderListenable<FinampImage> listenable) {
+    var image = Container(
+      decoration: widget.decoration,
+      child: BareAlbumImage(
+        imageListenable: listenable,
+        placeholderBuilder: widget.placeholderBuilder,
+        onZoomRoute: widget.onZoomRoute,
+      ),
+    );
+
+    if (widget.tapToZoom) {
+      final largeImage = AlbumImage(
+        item: imageScaled ? widget.item : null,
+        imageListenable: imageScaled ? null : listenable,
+        borderRadius: BorderRadius.zero,
+        placeholderBuilder: (_) => Stack(
+          fit: StackFit.passthrough,
+          children: [
+            image,
+            const Center(child: CircularProgressIndicator.adaptive()),
+          ],
+        ),
+        autoScale: false,
+        tapToZoom: false,
+        onZoomRoute: true,
+      );
+      // Show album as clickable on desktop
+      return MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          onTap: () => Navigator.of(context).push(
+            PageRouteBuilder<_ZoomedImage>(
+              opaque: false,
+              barrierDismissible: true,
+              transitionDuration: MediaQuery.disableAnimationsOf(context)
+                  ? Duration.zero
+                  : const Duration(milliseconds: 500),
+              pageBuilder: (BuildContext context, Animation<double> animation1, Animation<double> animation2) {
+                return _ZoomedImage(albumImage: largeImage, id: zoomID);
+              },
+            ),
+          ),
+          child: Hero(
+            tag: zoomID,
+            createRectTween: (begin, end) => RectTween(begin: begin, end: end),
+            child: image,
+            placeholderBuilder: (context, heroSize, child) => image,
+            flightShuttleBuilder: (_, __, ___, ____, _____) => largeImage,
+          ),
+        ),
+      );
+    }
+
+    return widget.disabled
+        ? Opacity(
+            opacity: 0.75,
+            child: ColorFiltered(colorFilter: const ColorFilter.mode(Colors.black, BlendMode.color), child: image),
+          )
+        : image;
+  }
 }
 
 /// An [AlbumImage] without any of the padding or media size detection.
 class BareAlbumImage extends ConsumerWidget {
-  const BareAlbumImage({
-    super.key,
-    required this.imageListenable,
-    this.imageProviderCallback,
-    this.errorBuilder = defaultErrorBuilder,
-    this.placeholderBuilder,
-    required this.onZoomRoute,
-  });
+  const BareAlbumImage({super.key, required this.imageListenable, this.placeholderBuilder, required this.onZoomRoute});
 
-  final ProviderListenable<ThemeImage> imageListenable;
+  final ProviderListenable<FinampImage> imageListenable;
   final WidgetBuilder? placeholderBuilder;
-  final OctoErrorBuilder errorBuilder;
-  final ImageProviderCallback? imageProviderCallback;
   final bool onZoomRoute;
 
   static Widget defaultPlaceholderBuilder(BuildContext context) {
@@ -221,7 +225,9 @@ class BareAlbumImage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    var ThemeImage(image: image, blurHash: blurHash) = ref.watch(imageListenable);
+    final imageInfo = ref.watch(imageListenable);
+    final blurHash = imageInfo.item?.blurHash;
+    final image = imageInfo.image;
     var localPlaceholder = placeholderBuilder;
     if (blurHash != null) {
       localPlaceholder ??= (_) => Image(
@@ -236,25 +242,82 @@ class BareAlbumImage extends ConsumerWidget {
     localPlaceholder ??= defaultPlaceholderBuilder;
 
     if (image != null) {
-      if (imageProviderCallback != null) {
-        imageProviderCallback!(image);
-      }
-      return OctoImage(
+      final fadeTime = MediaQuery.disableAnimationsOf(context) || onZoomRoute
+          ? Duration.zero
+          : const Duration(milliseconds: 700);
+
+      return Image(
+        key: ValueKey(image),
         image: image,
-        filterQuality: FilterQuality.medium,
-        fadeOutDuration: MediaQuery.of(context).disableAnimations || onZoomRoute
-            ? Duration.zero
-            : const Duration(milliseconds: 300),
-        fadeInDuration: MediaQuery.of(context).disableAnimations || onZoomRoute
-            ? Duration.zero
-            : const Duration(milliseconds: 300),
+        frameBuilder: (_, child, frame, _) => ImageFader(
+          key: ValueKey(image),
+          fadeTime: fadeTime,
+          placeholder: localPlaceholder!(context),
+          image: frame != null ? child : null,
+        ),
         fit: BoxFit.contain,
-        placeholderBuilder: localPlaceholder,
-        errorBuilder: errorBuilder,
+        alignment: Alignment.center,
+        repeat: ImageRepeat.noRepeat,
+        matchTextDirection: false,
+        filterQuality: FilterQuality.medium,
+        errorBuilder: defaultErrorBuilder,
       );
     }
 
     return Builder(builder: localPlaceholder);
+  }
+}
+
+/// Wait for an image to load and fade it in over the placeholder.  This is based on Octoimage, but with the ability to
+/// dynamically reduce the fade time for images which load quickly.
+class ImageFader extends StatefulWidget {
+  const ImageFader({super.key, required this.fadeTime, required this.placeholder, required this.image});
+
+  final Duration fadeTime;
+  final Widget placeholder;
+  final Widget? image;
+
+  @override
+  State<ImageFader> createState() => _ImageFaderState();
+}
+
+class _ImageFaderState extends State<ImageFader> {
+  bool wasSyncronouslyLoaded = true;
+  DateTime? startTime;
+  Duration? fadeTime;
+
+  @override
+  Widget build(BuildContext context) {
+    final image = widget.image;
+    // If we have never built without the image, just return the child without the fadein stack
+    if (image != null && wasSyncronouslyLoaded) return image;
+
+    wasSyncronouslyLoaded = false;
+    startTime ??= DateTime.now();
+
+    if (image == null) return widget.placeholder;
+
+    // This point is only reached when we have previously shown the placeholder but have now been rebuilt with a loaded image
+    if (fadeTime == null) {
+      // The widget fade in time is the smaller of the widget fadeTime or the time between widget creation and initial image load
+      final loadTime = DateTime.now().difference(startTime!);
+      fadeTime = Duration(
+        microseconds: loadTime.inMicroseconds.clamp(Duration.zero.inMicroseconds, widget.fadeTime.inMicroseconds),
+      );
+    }
+    return Stack(
+      fit: StackFit.passthrough,
+      alignment: Alignment.center,
+      children: [
+        FadeWidget(duration: fadeTime!, curve: Curves.easeIn, child: image),
+        FadeWidget(
+          duration: fadeTime!,
+          curve: Curves.easeOut,
+          direction: AnimationDirection.reverse,
+          child: widget.placeholder,
+        ),
+      ],
+    );
   }
 }
 

@@ -1,24 +1,27 @@
 import 'dart:async';
 
-import 'package:finamp/components/Buttons/cta_medium.dart';
+import 'package:finamp/components/AlbumScreen/download_button.dart';
+import 'package:finamp/components/ArtistScreen/artist_screen_content_flexible_space_bar.dart';
+import 'package:finamp/components/MusicScreen/item_wrapper.dart';
+import 'package:finamp/components/MusicScreen/sort_and_filter_row.dart';
 import 'package:finamp/components/curated_item_filter_row.dart';
-import 'package:finamp/services/artist_content_provider.dart';
 import 'package:finamp/components/curated_item_sections.dart';
+import 'package:finamp/components/favorite_button.dart';
+import 'package:finamp/components/finamp_app_bar_back_button.dart';
+import 'package:finamp/components/padded_custom_scrollview.dart';
 import 'package:finamp/l10n/app_localizations.dart';
+import 'package:finamp/models/finamp_models.dart';
+import 'package:finamp/models/jellyfin_models.dart';
+import 'package:finamp/screens/music_screen.dart';
+import 'package:finamp/services/artist_content_provider.dart';
+import 'package:finamp/services/downloads_service.dart';
+import 'package:finamp/services/finamp_settings_helper.dart';
 import 'package:finamp/services/finamp_user_helper.dart';
+import 'package:finamp/services/jellyfin_api_helper.dart';
+import 'package:finamp/services/music_screen_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:get_it/get_it.dart';
-
-import '../../models/finamp_models.dart';
-import '../../models/jellyfin_models.dart';
-import '../../services/downloads_service.dart';
-import '../../services/finamp_settings_helper.dart';
-import '../../services/jellyfin_api_helper.dart';
-import '../AlbumScreen/download_button.dart';
-import '../favorite_button.dart';
-import '../padded_custom_scrollview.dart';
-import 'artist_screen_content_flexible_space_bar.dart';
 
 class ArtistScreenContent extends ConsumerStatefulWidget {
   const ArtistScreenContent({super.key, required this.parent, this.library, this.genreFilter});
@@ -35,17 +38,28 @@ class _ArtistScreenContentState extends ConsumerState<ArtistScreenContent> {
   JellyfinApiHelper jellyfinApiHelper = GetIt.instance<JellyfinApiHelper>();
   final _downloadsService = GetIt.instance<DownloadsService>();
   final Set<CuratedItemSelectionType> _disabledTrackFilters = {};
-  BaseItemDto? currentGenreFilter;
+
+  SortAndFilterController controller = SortAndFilterController(
+    startingConfig: SortAndFilterConfiguration.defaultSort,
+    contentType: ContentType.mixed,
+  );
+
+  late final SortAndFilterController albumsController;
+  late final SortAndFilterController appearsOnController;
+
   CuratedItemSelectionType? clickedCuratedItemSelectionType;
 
   StreamSubscription<void>? _refreshStream;
 
   @override
   void initState() {
+    albumsController = SortAndFilterController.trackSettings(ContentType.inAlbumArtistAlbums);
+    appearsOnController = SortAndFilterController.trackSettings(ContentType.inPerformingArtistAlbums);
+
     _refreshStream = _downloadsService.offlineDeletesStream.listen((event) {
       _refresh();
     });
-    currentGenreFilter = widget.genreFilter;
+    controller.updateGenreFilter(widget.genreFilter);
     super.initState();
   }
 
@@ -64,14 +78,72 @@ class _ArtistScreenContentState extends ConsumerState<ArtistScreenContent> {
     _disabledTrackFilters.clear();
   }
 
-  // Function to update the genre filter
-  // Pass null in order to reset the filter
-  void updateGenreFilter(BaseItemDto? genre) {
-    setState(() {
-      // We also clear the disabledTrackFilters
-      _disabledTrackFilters.clear();
-      currentGenreFilter = genre;
-    });
+  void openSeeAll(
+    ContentType tabContentType, {
+    bool doOverride = true,
+    CuratedItemSelectionType? itemSelectionType,
+    BaseItemDto? genreFilter,
+  }) {
+    bool isFavoriteOverride = false;
+    SortBy? sortByOverride;
+    SortOrder? sortOrderOverride;
+
+    if (doOverride && ref.read(finampSettingsProvider.genreListsInheritSorting) && itemSelectionType != null) {
+      switch (itemSelectionType) {
+        case CuratedItemSelectionType.mostPlayed:
+          sortByOverride = itemSelectionType.getSortBy();
+          sortOrderOverride = SortOrder.descending;
+          isFavoriteOverride = false;
+        case CuratedItemSelectionType.favorites:
+          sortByOverride = SortBy.random;
+          sortOrderOverride = SortOrder.ascending;
+          isFavoriteOverride = true;
+        case CuratedItemSelectionType.random:
+          sortByOverride = itemSelectionType.getSortBy();
+          sortOrderOverride = SortOrder.ascending;
+          isFavoriteOverride = false;
+        case CuratedItemSelectionType.latestReleases:
+          sortByOverride = itemSelectionType.getSortBy();
+          sortOrderOverride = SortOrder.descending;
+          isFavoriteOverride = false;
+        case CuratedItemSelectionType.recentlyAdded:
+          sortByOverride = itemSelectionType.getSortBy();
+          sortOrderOverride = SortOrder.descending;
+          isFavoriteOverride = false;
+        case CuratedItemSelectionType.recentlyPlayed:
+          sortByOverride = itemSelectionType.getSortBy();
+          sortOrderOverride = SortOrder.descending;
+          isFavoriteOverride = false;
+      }
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute<MusicScreen>(
+        builder: (context) => MusicScreen(
+          singleTabConfig: HomeScreenSectionConfiguration(
+            base: TabsHomeSection(libraryId: currentLibraryPlaceholder, contentType: tabContentType),
+            customSectionTitle: widget.parent.name,
+            sortConfig: SortAndFilterController.trackSettings(tabContentType).resolveConfig().copyWith(
+              sortBy: sortByOverride,
+              sortOrder: sortOrderOverride,
+              favoriteFilter: isFavoriteOverride ? true : null,
+              genreFilter: genreFilter,
+              artistFilter: widget.parent,
+            ),
+          ),
+          allowFilters: (filter) => filter.type != ItemFilterType.artistFilter,
+        ),
+      ),
+    );
+  }
+
+  List<BaseItemDto> _applySortAndFilterLocally(List<BaseItemDto> items, SortAndFilterConfiguration config) {
+    var filteredList = items.where((item) {
+      if (config.favoritesFilter == true && !(item.userData?.isFavorite ?? false)) return false;
+      // Note: the genre filter gets set globally for this artist and gets applied directly inside of the providers
+      return true;
+    }).toList();
+
+    return sortItems(filteredList, config.sortBy, config.sortOrder);
   }
 
   @override
@@ -82,6 +154,12 @@ class _ArtistScreenContentState extends ConsumerState<ArtistScreenContent> {
     final artistCuratedItemSectionFilterOrder = ref.watch(finampSettingsProvider.artistItemSectionFilterChipOrder);
     final bool autoSwitchItemCurationTypeEnabled = ref.watch(finampSettingsProvider.autoSwitchItemCurationType);
 
+    final sortConfig = ref.watch(resolveSortProvider(controller));
+    final albumsSortConfig = ref.watch(resolveSortProvider(albumsController));
+    final appearsOnSortConfig = ref.watch(resolveSortProvider(appearsOnController));
+
+    final disableDownloads = sortConfig.filters.isNotEmpty;
+
     List<BaseItemDto> allChildren = [];
 
     /// Similarly to the sections on the genreScreen, we can let the tracks section auto-switch
@@ -89,18 +167,53 @@ class _ArtistScreenContentState extends ConsumerState<ArtistScreenContent> {
     /// will use the next available filter, fetch its items and return those in addition to a set
     /// containing the disabled filters that had no items.
     final (topTracksAsync, artistCuratedItemSelectionType, newDisabledTrackFilters) =
-        ref.watch(getArtistTracksSectionProvider(widget.parent, widget.library, currentGenreFilter)).valueOrNull ??
+        ref
+            .watch(
+              getArtistTracksSectionProvider(
+                artist: widget.parent,
+                libraryFilter: widget.library,
+                genreFilter: sortConfig.genreFilter?.id,
+              ),
+            )
+            .valueOrNull ??
         (null, null, null);
     final albumArtistAlbumsAsync = ref
-        .watch(getArtistAlbumsProvider(widget.parent, widget.library, currentGenreFilter))
+        .watch(
+          getArtistAlbumsProvider(
+            artist: widget.parent,
+            libraryFilter: widget.library?.id,
+            genreFilter: sortConfig.genreFilter?.id,
+          ),
+        )
         .valueOrNull;
     final performingArtistAlbumsAsync = ref
-        .watch(getPerformingArtistAlbumsProvider(widget.parent, widget.library, currentGenreFilter))
+        .watch(
+          getPerformingArtistAlbumsProvider(
+            artist: widget.parent,
+            libraryFilter: widget.library?.id,
+            genreFilter: sortConfig.genreFilter?.id,
+          ),
+        )
         .valueOrNull;
     final allPerformingArtistTracksAsync = ref
-        .watch(getPerformingArtistTracksProvider(widget.parent, widget.library, currentGenreFilter))
+        .watch(
+          getPerformingArtistTracksProvider(
+            artist: widget.parent,
+            libraryFilter: widget.library?.id,
+            genreFilter: sortConfig.genreFilter?.id,
+          ),
+        )
         .valueOrNull;
-    final allTracks = ref.watch(getArtistTracksProvider(widget.parent, widget.library, currentGenreFilter).future);
+
+    final allTracks = ref.watch(
+      getArtistTracksProvider(
+        artist: widget.parent,
+        libraryFilter: widget.library?.id,
+        genreFilter: sortConfig.genreFilter?.id,
+        sortAndFilterConfiguration: albumsSortConfig,
+        sortLikeAlbums: true,
+      ).future,
+    );
 
     final isLoading = topTracksAsync == null || albumArtistAlbumsAsync == null || performingArtistAlbumsAsync == null;
 
@@ -123,7 +236,7 @@ class _ArtistScreenContentState extends ConsumerState<ArtistScreenContent> {
         context: context,
         typeSelected: clickedCuratedItemSelectionType,
         messageFor: BaseItemDtoType.artist,
-        hasGenreFilter: (currentGenreFilter != null),
+        hasGenreFilter: (sortConfig.genreFilter != null),
       );
       // When we've sent the message, we should reset the clicked value
       // so that we don't send it again on next state refresh
@@ -131,15 +244,23 @@ class _ArtistScreenContentState extends ConsumerState<ArtistScreenContent> {
     }
 
     final topTracks = topTracksAsync ?? [];
-    final albumArtistAlbums = albumArtistAlbumsAsync ?? [];
-    final performingArtistAlbums = performingArtistAlbumsAsync ?? [];
-    final allPerformingArtistTracks = allPerformingArtistTracksAsync ?? [];
+    final albumArtistAlbums = albumArtistAlbumsAsync != null
+        ? _applySortAndFilterLocally(albumArtistAlbumsAsync, albumsSortConfig)
+        : <BaseItemDto>[];
 
-    var appearsOnAlbums = performingArtistAlbums.where((a) => !albumArtistAlbums.any((b) => b.id == a.id)).toList();
+    final performingArtistAlbums = performingArtistAlbumsAsync ?? [];
+    var appearsOnAlbumsList = performingArtistAlbums
+        .where((a) => !(albumArtistAlbumsAsync ?? []).any((b) => b.id == a.id))
+        .toList();
+    final appearsOnAlbums = appearsOnAlbumsList.isNotEmpty
+        ? _applySortAndFilterLocally(appearsOnAlbumsList, appearsOnSortConfig)
+        : <BaseItemDto>[];
+
+    final allPerformingArtistTracks = allPerformingArtistTracksAsync ?? [];
 
     // Combine Children to get correct ChildrenCount
     // for the Download Status Sync Display for Artists
-    allChildren = [...albumArtistAlbums, ...allPerformingArtistTracks];
+    allChildren = [...(albumArtistAlbumsAsync ?? []), ...allPerformingArtistTracks];
 
     return RefreshIndicator(
       onRefresh: _refresh,
@@ -147,18 +268,25 @@ class _ArtistScreenContentState extends ConsumerState<ArtistScreenContent> {
         slivers: <Widget>[
           SliverAppBar(
             title: Text(widget.parent.name ?? AppLocalizations.of(context)!.unknownName),
-            // 125 + 116 is the total height of the widget we use as a
-            // FlexibleSpaceBar. We add the toolbar height since the widget
+            // This is the total height of the widget we use as a
+            // FlexibleSpaceBar. We add the toolbar height ([kToolbarHeight]) since the widget
             // should appear below the appbar.
-            expandedHeight: kToolbarHeight + 125 + 24 + CTAMedium.predictedHeight(context),
+            expandedHeight:
+                kToolbarHeight +
+                125 +
+                24 +
+                100 +
+                (sortConfig.filters.where((x) => x.type != ItemFilterType.genreFilter).isNotEmpty
+                    ? SortAndFilterRow.height + 10
+                    : 0),
+            leading: FinampAppBarBackButton(),
             centerTitle: false,
             pinned: true,
             flexibleSpace: ArtistScreenContentFlexibleSpaceBar(
               parentItem: widget.parent,
               allTracks: allTracks,
               albumCount: albumArtistAlbums.length,
-              genreFilter: currentGenreFilter,
-              updateGenreFilter: updateGenreFilter,
+              controller: controller,
             ),
             actions: [
               FavoriteButton(item: widget.parent),
@@ -172,14 +300,19 @@ class _ArtistScreenContentState extends ConsumerState<ArtistScreenContent> {
                     ),
                   ),
                   children: allChildren,
-                  downloadDisabled: (currentGenreFilter != null),
-                  customTooltip: (currentGenreFilter != null)
+                  downloadDisabled: disableDownloads,
+                  customTooltip: disableDownloads
                       ? AppLocalizations.of(context)!.downloadButtonDisabledGenreFilterTooltip
                       : null,
                 ),
+              IconButton(
+                icon: const Icon(Icons.more_vert),
+                onPressed: () {
+                  openItemMenu(context: context, item: widget.parent);
+                },
+              ),
             ],
           ),
-          const SliverToBoxAdapter(child: SizedBox(height: 10)),
           if (!isLoading)
             ...artistItemSectionsOrder.map((type) {
               switch (type) {
@@ -191,9 +324,10 @@ class _ArtistScreenContentState extends ConsumerState<ArtistScreenContent> {
                         parent: widget.parent,
                         tracks: topTracks,
                         childrenForQueue: topTracks,
+                        lazyAddMoreTracksToQueue: true,
                         tracksText: type.toLocalisedSectionTitle(context, artistCuratedItemSelectionType),
                         isOnArtistScreen: true,
-                        genreFilter: currentGenreFilter,
+                        genreFilter: sortConfig.genreFilter,
                         includeFilterRow: true,
                         customFilterOrder: artistCuratedItemSectionFilterOrder,
                         selectedFilter: artistCuratedItemSelectionType,
@@ -205,6 +339,11 @@ class _ArtistScreenContentState extends ConsumerState<ArtistScreenContent> {
                           clickedCuratedItemSelectionType = type;
                           FinampSetters.setArtistCuratedItemSelectionType(type);
                         },
+                        seeAllCallbackFunction: () => openSeeAll(
+                          ContentType.tracks,
+                          itemSelectionType: artistCuratedItemSelectionType,
+                          genreFilter: sortConfig.genreFilter,
+                        ),
                       ),
                     );
                   }
@@ -218,6 +357,9 @@ class _ArtistScreenContentState extends ConsumerState<ArtistScreenContent> {
                         itemsText: AppLocalizations.of(context)!.albums,
                         items: albumArtistAlbums,
                         albumsShowYearAndDurationInstead: true,
+                        sortAndFilterRow: albumArtistAlbums.length > 1
+                            ? SortAndFilterRow(controller: albumsController, contentType: ContentType.albums)
+                            : null,
                       ),
                     );
                   }
@@ -231,6 +373,9 @@ class _ArtistScreenContentState extends ConsumerState<ArtistScreenContent> {
                         itemsText: AppLocalizations.of(context)!.appearsOnAlbums,
                         items: appearsOnAlbums,
                         albumsShowYearAndDurationInstead: true,
+                        sortAndFilterRow: appearsOnAlbums.length > 1
+                            ? SortAndFilterRow(controller: appearsOnController, contentType: ContentType.albums)
+                            : null,
                       ),
                     );
                   }
@@ -246,7 +391,7 @@ class _ArtistScreenContentState extends ConsumerState<ArtistScreenContent> {
                   child: Center(
                     child: Text(
                       AppLocalizations.of(context)!.emptyFilteredListTitle,
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
                     ),
                   ),
                 ),

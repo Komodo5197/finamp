@@ -12,16 +12,24 @@ import '../album_image.dart';
 import 'item_file_size.dart';
 
 class DownloadedItemsTitle extends StatelessWidget {
-  const DownloadedItemsTitle({super.key, required this.title});
+  const DownloadedItemsTitle({super.key, required this.title, this.action});
 
   final String title;
+
+  final Widget? action;
 
   @override
   Widget build(BuildContext context) {
     return SliverToBoxAdapter(
       child: Padding(
         padding: const EdgeInsets.only(left: 16, top: 12, right: 16, bottom: 4),
-        child: Text(title, style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500)),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(title, style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500)),
+            if (action != null) action!,
+          ],
+        ),
       ),
     );
   }
@@ -41,67 +49,51 @@ class _DownloadedItemTypeListState extends ConsumerState<DownloadedItemsList> {
 
   @override
   Widget build(BuildContext context) {
-    return ref
-        .watch(_downloadsService.userDownloadedItemsProvider(widget.type))
-        .when(
-          data: (items) => items.isNotEmpty
-              ? SliverList(
-                  delegate: SliverChildBuilderDelegate((context, index) {
-                    DownloadStub stub = items.elementAt(index);
-                    return ExpansionTile(
-                      key: PageStorageKey(stub.id),
-                      leading: (stub.type == DownloadItemType.finampCollection)
-                          ? AlbumImage(item: stub.finampCollection?.item)
-                          : AlbumImage(item: stub.baseItem),
-                      title: Text(stub.baseItem?.name ?? stub.name),
-                      subtitle: buildDownloadedItemSubtitle(context, stub),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if ((!(stub.baseItemType == BaseItemDtoType.album ||
-                                  stub.baseItemType == BaseItemDtoType.track)) &&
-                              !ref.watch(finampSettingsProvider.isOffline))
-                            IconButton(
-                              icon: const Icon(Icons.sync),
-                              onPressed: () {
-                                _downloadsService.resync(stub, null);
-                              },
-                            ),
-                          IconButton(
-                            icon: const Icon(Icons.delete),
-                            onPressed: () => askBeforeDeleteDownloadFromDevice(context, stub),
-                          ),
-                        ],
+    final items = ref.watch(_downloadsService.userDownloadedItemsProvider(widget.type));
+    return items.isNotEmpty
+        ? SliverList(
+            delegate: SliverChildBuilderDelegate((context, index) {
+              DownloadStub stub = items.elementAt(index);
+              return ExpansionTile(
+                key: PageStorageKey(stub.id),
+                leading: (stub.type == DownloadItemType.finampCollection)
+                    ? AlbumImage(item: stub.finampCollection?.item)
+                    : AlbumImage(item: stub.baseItem),
+                title: Text(stub.baseItem?.name ?? stub.name),
+                subtitle: buildDownloadedItemSubtitle(context, stub),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if ((!(stub.baseItemType == BaseItemDtoType.album || stub.baseItemType == BaseItemDtoType.track)) &&
+                        !ref.watch(finampSettingsProvider.isOffline))
+                      IconButton(
+                        icon: const Icon(Icons.sync),
+                        onPressed: () {
+                          _downloadsService.resync(stub, null);
+                        },
                       ),
-                      tilePadding: const EdgeInsets.symmetric(horizontal: 16),
-                      shape: LinearBorder(),
-                      collapsedShape: LinearBorder(),
-                      children: [
-                        if (stub.type == DownloadItemType.finampCollection || stub.baseItemType.hasChildren)
-                          DownloadedChildrenList(parent: stub),
-                      ],
-                    );
-                  }, childCount: items.length),
-                )
-              : SliverToBoxAdapter(
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    child: Text(AppLocalizations.of(context)!.noItemsDownloaded),
-                  ),
+                    IconButton(
+                      icon: const Icon(Icons.delete),
+                      onPressed: () => askBeforeDeleteDownloadFromDevice(context, stub),
+                    ),
+                  ],
                 ),
-          loading: () => const SliverToBoxAdapter(
+                tilePadding: const EdgeInsets.symmetric(horizontal: 16),
+                shape: LinearBorder(),
+                collapsedShape: LinearBorder(),
+                children: [
+                  if (stub.type == DownloadItemType.finampCollection || stub.baseItemType.hasChildren)
+                    DownloadedChildrenList(parent: stub),
+                ],
+              );
+            }, childCount: items.length),
+          )
+        : SliverToBoxAdapter(
             child: Padding(
-              padding: EdgeInsets.only(top: 8, bottom: 16),
-              child: Center(child: CircularProgressIndicator()),
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Text(AppLocalizations.of(context)!.noItemsDownloaded),
             ),
-          ),
-          error: (error, stack) => SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Text(error.toString()),
-            ),
-          ),
-        );
+          );
   }
 }
 

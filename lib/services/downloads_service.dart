@@ -8,6 +8,7 @@ import 'package:finamp/components/global_snackbar.dart';
 import 'package:finamp/l10n/app_localizations.dart';
 import 'package:finamp/services/finamp_user_helper.dart';
 import 'package:finamp/services/jellyfin_api_helper.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:get_it/get_it.dart';
@@ -79,6 +80,9 @@ class DownloadsService {
   /// Causes the downloads queue to stop processing new items
   bool get allowDownloads => allowSyncs && !syncBuffer.isRunning;
 
+  /// Marks whether we have encountered an image with a missing blurhash
+  bool serverMissingBlurhash = false;
+
   //
   // Providers
   //
@@ -120,39 +124,41 @@ class DownloadsService {
 
   /// Provider for user-downloaded items of a specific category.
   /// Used to show and group downloaded items on the downloads screen.
-  late final userDownloadedItemsProvider = FutureProvider.family
-      .autoDispose<List<DownloadStub>, DownloadsScreenCategory>((ref, category) async {
-        // Refresh lists when addDownload or removeDownload is called.
-        ref.watch(_anchorProvider);
-        final allItems = await _isar.downloadItems
-            .filter()
-            .requiredBy((q) => q.isarIdEqualTo(_anchor.isarId))
-            .sortByName()
-            .findAll();
+  late final userDownloadedItemsProvider = Provider.family.autoDispose<List<DownloadStub>, DownloadsScreenCategory>((
+    ref,
+    category,
+  ) {
+    // Refresh lists when addDownload or removeDownload is called.
+    ref.watch(_anchorProvider);
+    final allItems = _isar.downloadItems
+        .filter()
+        .requiredBy((q) => q.isarIdEqualTo(_anchor.isarId))
+        .sortByName()
+        .findAllSync();
 
-        return allItems
-            .where(
-              (item) => switch (category) {
-                DownloadsScreenCategory.special =>
-                  item.type == category.type &&
-                      item.finampCollection?.type != FinampCollectionType.collectionWithLibraryFilter,
+    return allItems
+        .where(
+          (item) => switch (category) {
+            DownloadsScreenCategory.special =>
+              item.type == category.type &&
+                  item.finampCollection?.type != FinampCollectionType.collectionWithLibraryFilter,
 
-                DownloadsScreenCategory.artists =>
-                  (item.type == category.type && item.baseItemType == category.baseItemType) ||
-                      (item.finampCollection?.type == FinampCollectionType.collectionWithLibraryFilter &&
-                          BaseItemDtoType.fromItem(item.finampCollection!.item!) == BaseItemDtoType.artist),
+            DownloadsScreenCategory.artists =>
+              (item.type == category.type && item.baseItemType == category.baseItemType) ||
+                  (item.finampCollection?.type == FinampCollectionType.collectionWithLibraryFilter &&
+                      BaseItemDtoType.fromItem(item.finampCollection!.item!) == BaseItemDtoType.artist),
 
-                DownloadsScreenCategory.genres =>
-                  (item.type == category.type && item.baseItemType == category.baseItemType) ||
-                      (item.finampCollection?.type == FinampCollectionType.collectionWithLibraryFilter &&
-                          BaseItemDtoType.fromItem(item.finampCollection!.item!) == BaseItemDtoType.genre),
-                _ =>
-                  item.type == category.type &&
-                      (category.baseItemType == null || item.baseItemType == category.baseItemType),
-              },
-            )
-            .toList();
-      });
+            DownloadsScreenCategory.genres =>
+              (item.type == category.type && item.baseItemType == category.baseItemType) ||
+                  (item.finampCollection?.type == FinampCollectionType.collectionWithLibraryFilter &&
+                      BaseItemDtoType.fromItem(item.finampCollection!.item!) == BaseItemDtoType.genre),
+            _ =>
+              item.type == category.type &&
+                  (category.baseItemType == null || item.baseItemType == category.baseItemType),
+          },
+        )
+        .toList();
+  });
 
   /// Constructs the service.  startQueues should also be called to complete initialization.
   DownloadsService() {
@@ -215,15 +221,20 @@ class DownloadsService {
                   case "image/webp":
                     extension = ".webp";
                 }
-                Future.sync(() async {
-                  assert(
-                    listener.file?.path == await event.task.filePath() ||
-                        (extension != null &&
-                            listener.file?.path.replaceFirst(RegExp(r'\.image$'), extension) ==
-                                await event.task.filePath()),
-                    "${listener.name} ${listener.path} ${listener.fileDownloadLocation?.baseDirectory} ${listener.file?.path} ${await event.task.filePath()} $extension",
-                  );
-                });
+                if (kDebugMode) {
+                  Future.sync(() async {
+                    // capture listener path before we await and it is potentially changed
+                    final listenerFile = listener.file;
+                    final listenerPath = listener.path;
+                    assert(
+                      listenerFile?.path == await event.task.filePath() ||
+                          (extension != null &&
+                              listenerFile?.path.replaceFirst(RegExp(r'\.image$'), extension) ==
+                                  await event.task.filePath()),
+                      "${listener.name} $listenerPath ${listener.fileDownloadLocation?.baseDirectory} ${listenerFile?.path} ${await event.task.filePath()} $extension",
+                    );
+                  });
+                }
                 if (extension != null && listener.file!.path.endsWith(".image")) {
                   // Do not wait for file move to complete to prevent slowing isar write
                   unawaited(
@@ -750,15 +761,11 @@ class DownloadsService {
     final JellyfinApiHelper jellyfinApiData = GetIt.instance<JellyfinApiHelper>();
     for (var item in allItems) {
       if (item.baseItem?.mediaStreams?.any((stream) => stream.type == "Lyric") ?? false) {
-        // check if lyrics are already downloaded
-        if (_isar.downloadedLyrics.where().isarIdEqualTo(item.isarId).countSync() > 0) {
-          continue;
-        }
         idsWithLyrics[item.isarId] = null;
         LyricDto? lyrics;
         try {
           lyrics = await jellyfinApiData.getLyrics(itemId: BaseItemId(item.id));
-          _downloadsLogger.finer("Fetched lyrics for ${item.name}");
+          _downloadsLogger.finest("Fetched lyrics for ${item.name}");
           idsWithLyrics[item.isarId] = lyrics;
         } catch (e) {
           _downloadsLogger.warning("Failed to fetch lyrics for ${item.name}.");
@@ -766,11 +773,16 @@ class DownloadsService {
       }
     }
     _isar.writeTxnSync(() {
-      for (var id in idsWithLyrics.keys) {
+      for (var id in idsWithLyrics.keys.where((id) {
+        final oldLyricsVersion = _isar.downloadedLyrics.getSync(id)?.lyricDto?.metadata?.version;
+        // if the versions don't match (or it isn't set), apply the new lyrics to be safe
+        return idsWithLyrics[id]?.metadata?.version == null || oldLyricsVersion != idsWithLyrics[id]?.metadata?.version;
+      })) {
         var canonItem = _isar.downloadItems.getSync(id);
         if (canonItem != null && idsWithLyrics[id] != null) {
           final lyricsItem = DownloadedLyrics.fromItem(isarId: canonItem.isarId, item: idsWithLyrics[id]!);
           _isar.downloadedLyrics.putSync(lyricsItem, saveLinks: false);
+          _downloadsLogger.finer("Updated lyrics for '${canonItem.name}'");
         }
       }
     });
@@ -1310,7 +1322,7 @@ class DownloadsService {
   Future<List<BaseItemDto>> getCollectionTracks(
     BaseItemDto item, {
     bool playable = true,
-    BaseItemDto? genreFilter,
+    BaseItemId? genreFilter,
     bool onlyFavorites = false,
   }) async {
     List<int> favoriteIds = [];
@@ -1337,8 +1349,7 @@ class DownloadsService {
         .optional(
           genreFilter != null,
           (q) => q.infoFor(
-            (q) =>
-                q.info((q) => q.isarIdEqualTo(DownloadStub.getHash(genreFilter!.id.raw, DownloadItemType.collection))),
+            (q) => q.info((q) => q.isarIdEqualTo(DownloadStub.getHash(genreFilter!.raw, DownloadItemType.collection))),
           ),
         );
 
@@ -1365,7 +1376,7 @@ class DownloadsService {
     BaseItemId? viewFilter,
     bool nullableViewFilters = true,
     bool onlyFavorites = false,
-    BaseItemDto? genreFilter,
+    BaseItemId? genreFilter,
   }) {
     List<int> favoriteIds = [];
     if (onlyFavorites) {
@@ -1388,7 +1399,7 @@ class DownloadsService {
         // Returns items that have a certain genreId assigned
         .optional(
           genreFilter != null,
-          (q) => q.info((q) => q.isarIdEqualTo(DownloadStub.getHash(genreFilter!.id.raw, DownloadItemType.collection))),
+          (q) => q.info((q) => q.isarIdEqualTo(DownloadStub.getHash(genreFilter!.raw, DownloadItemType.collection))),
         )
         .optional(
           viewFilter != null,
@@ -1423,7 +1434,7 @@ class DownloadsService {
   /// Get all downloaded collections.  Used for non-tracks tabs on music screen and
   /// on artist/genre screens.  Can have one or more filters applied:
   /// + nameFilter - only return collections containing nameFilter in their name, case insensitive.
-  /// + baseTypeFilter - only return collections of the given BaseItemDto type.
+  /// + includeItemTypes - only return collections of the given BaseItemDto types.
   /// + relatedTo - only return collections containing tracks which have relatedTo as
   /// their artist, album, or genre.
   /// + fullyDownloaded - only return collections which are fully downloaded.  Artists/genres
@@ -1436,7 +1447,7 @@ class DownloadsService {
   /// + genreFilter - only return albums that have the provided genre id assigned
   Future<List<DownloadStub>> getAllCollections({
     String? nameFilter,
-    BaseItemDtoType? baseTypeFilter,
+    List<BaseItemDtoType> includeItemTypes = const [],
     BaseItemDto? relatedTo,
     bool fullyDownloaded = false,
     BaseItemId? viewFilter,
@@ -1445,11 +1456,11 @@ class DownloadsService {
     bool onlyFavorites = false,
     BaseItemDtoType? infoForType,
     ArtistType? artistType,
-    BaseItemDto? genreFilter,
+    BaseItemId? genreFilter,
   }) {
     List<int> favoriteIds = [];
     List<int> libraryFilteredIds = [];
-    if (onlyFavorites && baseTypeFilter != BaseItemDtoType.genre) {
+    if (onlyFavorites && !includeItemTypes.contains(BaseItemDtoType.genre)) {
       favoriteIds = _getFavoriteIds() ?? [];
     }
     if (fullyDownloaded) {
@@ -1478,15 +1489,17 @@ class DownloadsService {
         .typeEqualTo(DownloadItemType.collection)
         .filter()
         .optional(nameFilter != null, (q) => q.nameContains(nameFilter!, caseSensitive: false))
-        .optional(baseTypeFilter != null, (q) => q.baseItemTypeEqualTo(baseTypeFilter!))
+        .optional(
+          includeItemTypes.isNotEmpty,
+          (q) => q.anyOf(includeItemTypes, (q, type) => q.baseItemTypeEqualTo(type)),
+        )
         // If allPlaylists is info downloaded, we may have info for empty
         // playlists.  We should only return playlists with at least 1 required
         // track in them.
         .optional(
-          baseTypeFilter == BaseItemDtoType.playlist,
+          includeItemTypes.contains(BaseItemDtoType.playlist),
           (q) => q.info((q) => q.typeEqualTo(DownloadItemType.track).requiredByIsNotEmpty()),
         )
-        // Returns albums where the artist (relatedTo) is an Album Artist
         .optional(
           artistType == ArtistType.albumArtist && relatedTo != null,
           (q) => q.info((q) => q.isarIdEqualTo(DownloadStub.getHash(relatedTo!.id.raw, DownloadItemType.collection))),
@@ -1502,8 +1515,7 @@ class DownloadsService {
         .optional(
           genreFilter != null,
           (q) => q.infoFor(
-            (q) =>
-                q.info((q) => q.isarIdEqualTo(DownloadStub.getHash(genreFilter!.id.raw, DownloadItemType.collection))),
+            (q) => q.info((q) => q.isarIdEqualTo(DownloadStub.getHash(genreFilter!.raw, DownloadItemType.collection))),
           ),
         )
         .optional(
@@ -1572,6 +1584,9 @@ class DownloadsService {
     if (imageId == null) {
       return null;
     }
+    if (item != null && item.blurHash == null) {
+      serverMissingBlurhash = true;
+    }
     return _getDownloadByID(imageId, DownloadItemType.image);
   }
 
@@ -1584,6 +1599,27 @@ class DownloadsService {
   bool? isFavorite(BaseItemDto item) {
     var stubId = DownloadStub.getHash(item.id.raw, item.downloadType);
     return _getFavoriteIds()?.contains(stubId);
+  }
+
+  /// Returns the amount of favorites known offline, optionally filtered by
+  /// [baseItemType].
+  /// Returns null if the favorites metadata has never been synced, e.g. because
+  /// trackOfflineFavorites is disabled, there are no downloads yet, or the
+  /// setting was turned off after previously being enabled.
+  /// A return value of 0 means the metadata exists and there are simply no favorites.
+  int? getFavoritesCount({BaseItemDtoType? baseItemType}) {
+    var stub = DownloadStub.fromFinampCollection(FinampCollection(type: FinampCollectionType.favorites));
+    var favoriteIds = _isar.downloadItems.getSync(stub.isarId)?.orderedChildren;
+    if (favoriteIds == null) return null;
+    if (baseItemType == null) {
+      return favoriteIds.length;
+    }
+    return _isar.downloadItems
+        .where()
+        .anyOf(favoriteIds, (q, id) => q.isarIdEqualTo(id))
+        .filter()
+        .baseItemTypeEqualTo(baseItemType)
+        .countSync();
   }
 
   List<int>? _getFavoriteIds() {

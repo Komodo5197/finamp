@@ -14,16 +14,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_tabler_icons/flutter_tabler_icons.dart';
 import 'package:get_it/get_it.dart';
 
+import '../../menus/playlist_actions_menu.dart';
 import '../../models/jellyfin_models.dart';
+import '../../services/album_screen_provider.dart';
 import '../confirmation_prompt_dialog.dart';
 import '../global_snackbar.dart';
 import 'new_playlist_dialog.dart';
-import '../../menus/playlist_actions_menu.dart';
 
 class AddToPlaylistList extends StatefulWidget {
-  const AddToPlaylistList({super.key, required this.itemToAdd, required this.playlistsFuture});
+  const AddToPlaylistList({super.key, required this.itemsToAdd, required this.playlistsFuture});
 
-  final BaseItemDto itemToAdd;
+  final List<BaseItemDto> itemsToAdd;
   final Future<List<BaseItemDto>> playlistsFuture;
 
   @override
@@ -54,7 +55,7 @@ class _AddToPlaylistListState extends State<AddToPlaylistList> {
               final (playlist, isLoading, playListItemId) = snapshot.data![index];
               return AddToPlaylistTile(
                 playlist: playlist,
-                track: widget.itemToAdd,
+                itemsToBeAdded: widget.itemsToAdd,
                 playlistItemId: playListItemId,
                 isLoading: isLoading,
               );
@@ -89,9 +90,26 @@ class _AddToPlaylistListState extends State<AddToPlaylistList> {
             icon: TablerIcons.plus,
             //accentColor: Theme.of(context).colorScheme.primary,
             onPressed: () async {
+              var itemsToAdd = widget.itemsToAdd;
+              // Albums and playlists do not seem to add in the correct order, so manually fetch and add all children instead of
+              // relying on server to do that.
+              if (itemsToAdd.length == 1 &&
+                  [
+                    BaseItemDtoType.album,
+                    BaseItemDtoType.playlist,
+                  ].contains(BaseItemDtoType.fromItem(itemsToAdd.first))) {
+                final children = await GetIt.instance<ProviderContainer>().read(
+                  getAlbumOrPlaylistTracksProvider(itemsToAdd.first).future,
+                );
+                itemsToAdd = children.$1;
+              }
               var dialogResult = await showDialog<(Future<BaseItemId>, String?)?>(
                 context: context,
-                builder: (context) => NewPlaylistDialog(itemsToAdd: [widget.itemToAdd.id]),
+                builder: (context) => NewPlaylistDialog(
+                  itemsToAdd: itemsToAdd.map((item) {
+                    return item.id;
+                  }).toList(),
+                ),
               );
               if (dialogResult != null) {
                 var oldFuture = playlistsFuture;
@@ -104,17 +122,20 @@ class _AddToPlaylistListState extends State<AddToPlaylistList> {
                 try {
                   var newId = await dialogResult.$1;
                   // Give the server time to calculate an initial playlist image
-                  await Future.delayed(const Duration(seconds: 1));
+                  await Future<void>.delayed(const Duration(seconds: 1));
                   final jellyfinApiHelper = GetIt.instance<JellyfinApiHelper>();
                   var playlist = await jellyfinApiHelper.getItemById(newId);
 
                   String? trackId;
-                  if (BaseItemDtoType.fromItem(widget.itemToAdd) == BaseItemDtoType.track) {
+                  if (widget.itemsToAdd.length == 1 &&
+                      BaseItemDtoType.fromItem(widget.itemsToAdd.first) == BaseItemDtoType.track) {
                     var playlistItems = await jellyfinApiHelper.getItems(parentItem: playlist, fields: "");
-                    trackId = playlistItems?.firstWhere((element) => element.id == widget.itemToAdd.id).playlistItemId;
+                    trackId = playlistItems
+                        ?.firstWhere((element) => element.id == widget.itemsToAdd.first.id)
+                        .playlistItemId;
                   } else {
-                    // Provide a fake playlist id for playlists created with a non-track initial item.  It
-                    // will not be used as non-tracks cannot be removed.
+                    // Provide a fake playlist id for playlists created with a non-track initial item.
+                    // It will not be used as non-tracks cannot be removed.
                     trackId = "";
                   }
                   if (!context.mounted) return;
@@ -139,12 +160,12 @@ class AddToPlaylistTile extends ConsumerStatefulWidget {
     super.key,
     required this.playlist,
     this.playlistItemId,
-    required this.track,
+    required this.itemsToBeAdded,
     this.isLoading = false,
   });
 
   final BaseItemDto playlist;
-  final BaseItemDto track;
+  final List<BaseItemDto> itemsToBeAdded;
   final String? playlistItemId;
   final bool isLoading;
 
@@ -177,7 +198,11 @@ class _AddToPlaylistTileState extends ConsumerState<AddToPlaylistTile> {
         itemIsIncluded = true;
       } else {
         final downloadsService = GetIt.instance<DownloadsService>();
-        itemIsIncluded = downloadsService.checkIfInCollection(widget.playlist, widget.track);
+        if (widget.itemsToBeAdded.length > 1) {
+          itemIsIncluded = false;
+        } else {
+          itemIsIncluded = downloadsService.checkIfInCollection(widget.playlist, widget.itemsToBeAdded.first);
+        }
       }
     }
   }
@@ -185,6 +210,12 @@ class _AddToPlaylistTileState extends ConsumerState<AddToPlaylistTile> {
   @override
   Widget build(BuildContext context) {
     final isOffline = ref.watch(finampSettingsProvider.isOffline);
+    bool willAddMultipleTracks =
+        widget.itemsToBeAdded.length > 1 ||
+        BaseItemDtoType.fromItem(widget.itemsToBeAdded.first) != BaseItemDtoType.track;
+    bool isMultipleTracks =
+        widget.itemsToBeAdded.length > 1 &&
+        BaseItemDtoType.fromItem(widget.itemsToBeAdded.first) == BaseItemDtoType.track;
     return PlaylistActionsPlaylistListTile(
       forceLoading: widget.isLoading,
       title: widget.playlist.name ?? AppLocalizations.of(context)!.unknownName,
@@ -196,10 +227,10 @@ class _AddToPlaylistTileState extends ConsumerState<AddToPlaylistTile> {
           ? TablerIcons.circle_dashed_plus
           : TablerIcons.circle_plus,
       initialState: itemIsIncluded ?? false,
-      onToggle: (bool currentState) async {
-        if (currentState) {
-          // Only tracks can be removed from playlists
-          if (BaseItemDtoType.fromItem(widget.track) != BaseItemDtoType.track) {
+      onToggle: (bool alreadyInPlaylist) async {
+        if (alreadyInPlaylist) {
+          // Only single tracks can be removed from playlists
+          if (willAddMultipleTracks) {
             return true;
           }
           // If playlistItemId is null, we need to fetch from the server before we can remove
@@ -207,7 +238,7 @@ class _AddToPlaylistTileState extends ConsumerState<AddToPlaylistTile> {
             final jellyfinApiHelper = GetIt.instance<JellyfinApiHelper>();
             var newItems = await jellyfinApiHelper.getItems(parentItem: widget.playlist, fields: "");
 
-            playlistItemId = newItems?.firstWhereOrNull((x) => x.id == widget.track.id)?.playlistItemId;
+            playlistItemId = newItems?.firstWhereOrNull((x) => x.id == widget.itemsToBeAdded.first.id)?.playlistItemId;
             if (playlistItemId == null) {
               // We were already not part of the playlist,. so removal is complete
               setState(() {
@@ -223,7 +254,7 @@ class _AddToPlaylistTileState extends ConsumerState<AddToPlaylistTile> {
           // part of playlist, remove
           bool removed = await removeFromPlaylist(
             context,
-            widget.track,
+            widget.itemsToBeAdded.first,
             widget.playlist,
             playlistItemId!,
             confirm: false,
@@ -236,37 +267,45 @@ class _AddToPlaylistTileState extends ConsumerState<AddToPlaylistTile> {
           }
           return !removed;
         } else {
-          // add to playlist
-          if (BaseItemDtoType.fromItem(widget.track) != BaseItemDtoType.track) {
+          // add item collection or multiple tracks to playlist
+          if (willAddMultipleTracks) {
             bool confirmed = false;
-            String itemType = switch (widget.track.type) {
-              "MusicAlbum" => "album",
-              "MusicArtist" => "artist",
-              "MusicGenre" => "genre",
-              "Playlist" => "playlist",
-              _ => "unknown",
-            };
-            await showDialog(
+            String promptText;
+            if (isMultipleTracks) {
+              promptText = AppLocalizations.of(
+                context,
+              )!.confirmAddMultipleTracksToPlaylist(widget.itemsToBeAdded.length);
+            } else {
+              String itemType = switch (BaseItemDtoType.fromItem(widget.itemsToBeAdded.first)) {
+                BaseItemDtoType.album => "album",
+                BaseItemDtoType.artist => "artist",
+                BaseItemDtoType.genre => "genre",
+                BaseItemDtoType.playlist => "playlist",
+                _ => "unknown",
+              };
+              promptText = AppLocalizations.of(
+                context,
+              )!.confirmAddCollectionItemToPlaylist(itemType, widget.itemsToBeAdded.first.name ?? "Unknown");
+            }
+            await showDialog<void>(
               context: context,
               builder: (context) => ConfirmationPromptDialog(
-                promptText: AppLocalizations.of(
-                  context,
-                )!.confirmAddAlbumToPlaylist(itemType, widget.track.name ?? "Unknown"),
+                promptText: promptText,
                 confirmButtonText: AppLocalizations.of(context)!.addButtonLabel,
-                abortButtonText: MaterialLocalizations.of(context).cancelButtonLabel,
                 onConfirmed: () => confirmed = true,
-                onAborted: () {},
               ),
             );
             if (!confirmed || !context.mounted) return false;
           }
-          bool added = await addItemToPlaylist(context, widget.track, widget.playlist);
+          bool added = await addItemsToPlaylist(context, widget.itemsToBeAdded, widget.playlist);
           if (added) {
             final jellyfinApiHelper = GetIt.instance<JellyfinApiHelper>();
             var newItems = await jellyfinApiHelper.getItems(parentItem: widget.playlist, fields: "");
             setState(() {
               childCount = newItems?.length ?? 0;
-              playlistItemId = newItems?.firstWhereOrNull((x) => x.id == widget.track.id)?.playlistItemId;
+              playlistItemId = newItems
+                  ?.firstWhereOrNull((x) => x.id == widget.itemsToBeAdded.first.id)
+                  ?.playlistItemId;
               itemIsIncluded = true;
             });
             return true; // this is called before the state is updated
