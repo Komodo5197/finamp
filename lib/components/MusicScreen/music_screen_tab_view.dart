@@ -20,7 +20,6 @@ import 'package:scroll_to_index/scroll_to_index.dart';
 import '../../extensions/localizations.dart';
 import '../../models/finamp_models.dart';
 import '../../models/jellyfin_models.dart';
-import '../../screens/music_screen.dart';
 import '../../services/downloads_service.dart';
 import '../../services/finamp_settings_helper.dart';
 import '../../services/music_screen_provider.dart';
@@ -356,23 +355,6 @@ class _MusicScreenTabViewState extends ConsumerState<MusicScreenTabView>
                               genreFilter: widget.sortConfig.genreFilter,
                               adaptiveAdditionalInfoSortBy: widget.sortConfig.sortBy,
                               showFavoriteIconOnlyWhenFilterDisabled: true,
-                              onTap: widget.contentType == ContentType.folders
-                                  ? () {
-                                      Navigator.of(context).push(
-                                        MaterialPageRoute<MusicScreen>(
-                                          builder: (context) => MusicScreen(
-                                            singleTabConfig: HomeScreenSectionConfiguration(
-                                              base: TabsHomeSection(
-                                                libraryId: item.item.id,
-                                                contentType: ContentType.folders,
-                                              ),
-                                              sortConfig: SortAndFilterConfiguration.defaultSort,
-                                            ),
-                                          ),
-                                        ),
-                                      );
-                                    }
-                                  : null,
                             ),
                             PlayableQueue() => QueueRestoreTile(info: item.queue),
                             LatestQueues() ||

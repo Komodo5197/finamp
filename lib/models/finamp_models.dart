@@ -4175,6 +4175,12 @@ class HomeScreenSectionConfiguration {
   @HiveField(3)
   final HomeScreenSectionPresetType? presetType;
 
+  ContentType get contentType => switch (base) {
+    QueuesHomeSection() => ContentType.home,
+    TabsHomeSection tab => tab.contentType,
+    CollectionHomeSection item => item.contentType,
+  };
+
   const HomeScreenSectionConfiguration({
     required this.base,
     required this.sortConfig,

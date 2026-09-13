@@ -328,7 +328,29 @@ Future<List<BaseItemDto>?> loadHomeSectionItems(
       sortBy: request.sortConfig.sortBy.jellyfinName(request.tab),
       sortOrder: request.sortConfig.sortOrder.toString(),
     );
-    print("ZZZZZZZZZZZZZZzz ${out?.map((x) => x.toJson()).toList()}");
+    out?.forEach((item) {
+      // Artist, genres, libraries, folders, and collections are returned as folders.  Tracks and other direct file types
+      // are returned as-is to allow playback.  Albums are returned as-is because jellyfin never shows any internal structure,
+      // so we can provide all features without loosing any browsing capabilities.
+      item.type = switch (BaseItemDtoType.fromItem(item)) {
+        BaseItemDtoType.album ||
+        BaseItemDtoType.playlist ||
+        BaseItemDtoType.track ||
+        BaseItemDtoType.musicVideo ||
+        BaseItemDtoType.audioBook ||
+        BaseItemDtoType.tvEpisode ||
+        BaseItemDtoType.video ||
+        BaseItemDtoType.movie ||
+        BaseItemDtoType.trailer ||
+        BaseItemDtoType.noItem ||
+        BaseItemDtoType.unknown => item.type,
+        BaseItemDtoType.artist ||
+        BaseItemDtoType.genre ||
+        BaseItemDtoType.library ||
+        BaseItemDtoType.folder ||
+        BaseItemDtoType.collection => BaseItemDtoType.folder.jellyfinName,
+      };
+    });
     return out;
   }
 

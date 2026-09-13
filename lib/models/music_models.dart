@@ -154,8 +154,7 @@ class MusicScreenPlayable<ChildType extends FinampPlayableDto> extends _Sortable
     ContentType.inAlbumArtistAlbums ||
     ContentType.inPerformingArtistAlbums ||
     ContentType.mixed => throw UnsupportedError("Invalid music screen content type $tab"),
-    // TODO: Handle this case.
-    ContentType.folders => 500,
+    ContentType.folders => 20,
   };
 
   @override
@@ -481,11 +480,7 @@ class UnavailableHomeSectionPlayable extends FinampDisplayable<FinampPlayable> {
 }
 
 class Folder extends _SortablePagedItem<FinampPlayableDto> {
-  Folder(super.item, {super.source, required super.sortConfig}) {
-    if (BaseItemDtoType.fromItem(item) != BaseItemDtoType.genre) {
-      throw UnsupportedError("Wrong BaseItemDto type: ${item.type}");
-    }
-  }
+  Folder(super.item, {super.source, required super.sortConfig});
 
   factory Folder.fromItem(BaseItemDto item) =>
       Folder(item, source: QueueItemSource.fromBaseItem(item), sortConfig: ResolvedSortConfig.defaultSort);
@@ -504,5 +499,12 @@ class Folder extends _SortablePagedItem<FinampPlayableDto> {
   Folder copyWith(ResolvedSortConfig newSort) => Folder(item, source: source, sortConfig: newSort);
 
   @override
-  int get normalChildSize => 20;
+  int get normalChildSize => switch (BaseItemDtoType.fromItem(item)) {
+    BaseItemDtoType.artist => 5,
+    BaseItemDtoType.playlist => 20,
+    BaseItemDtoType.library => 5,
+    BaseItemDtoType.folder => 10,
+    BaseItemDtoType.collection => 20,
+    _ => 1,
+  };
 }
