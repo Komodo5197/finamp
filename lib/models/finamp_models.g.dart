@@ -9712,6 +9712,7 @@ Map<String, dynamic> _$HomeScreenSectionConfigurationToJson(
   if (_$HomeScreenSectionPresetTypeEnumMap[instance.presetType]
       case final value?)
     'presetType': value,
+  'contentType': _$ContentTypeEnumMap[instance.contentType]!,
   'hashCode': instance.hashCode,
   'id': instance.id,
 };

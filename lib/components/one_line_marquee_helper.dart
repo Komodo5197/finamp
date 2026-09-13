@@ -75,11 +75,12 @@ class LeftSideEllipsis extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
+        final width = constraints.maxWidth - 7.0;
         final textPainter = TextPainter(
           text: TextSpan(text: text, style: style),
           maxLines: 1,
           textDirection: TextDirection.ltr,
-        )..layout(maxWidth: constraints.maxWidth);
+        )..layout(maxWidth: width);
 
         if (!textPainter.didExceedMaxLines) {
           textPainter.dispose();
@@ -96,8 +97,7 @@ class LeftSideEllipsis extends StatelessWidget {
         final showable = _binarySearch(
           0,
           text.length,
-          (length) =>
-              getWidth("...${text.substring(text.length - length, text.length)}").compareTo(constraints.maxWidth),
+          (length) => getWidth("...${text.substring(text.length - length, text.length)}").compareTo(width),
         );
         textPainter.dispose();
         return Text(
