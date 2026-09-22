@@ -97,6 +97,8 @@ class QueueService {
   SavedQueueState _savedQueueState = SavedQueueState.preInit;
   FinampStorableQueueInfo? _failedSavedQueue;
   static const int _maxSavedQueues = 60;
+  // This is just used to suppress the error message when loading is canceled deliberately
+  bool _queueLoadCanceled = false;
 
   static int get maxInitialQueueItems => Platform.isIOS || Platform.isMacOS
       ? 1000
@@ -438,6 +440,14 @@ class QueueService {
     }
   }
 
+  Future<void> cancelQueueLoad() async {
+    if (_savedQueueState == SavedQueueState.loading) {
+      _savedQueueState = SavedQueueState.pendingSave;
+      _queueLoadCanceled = true;
+      await stopAndClearQueue();
+    }
+  }
+
   Future<void> loadSavedQueue(
     FinampStorableQueueInfo info, {
     Map<jellyfin_models.BaseItemId, jellyfin_models.BaseItemDto>? existingItems,
@@ -570,6 +580,7 @@ class QueueService {
       int droppedTracks = info.trackCount - loadedTracks;
 
       if (_savedQueueState != SavedQueueState.loading) {
+        if (_queueLoadCanceled) return;
         return Future.error("Loading of saved Queue was interrupted.");
       }
 
@@ -614,6 +625,7 @@ class QueueService {
           unawaited(playbackHistoryService.reportRestoredSessionStatus());
         });
       }
+      _queueLoadCanceled = false;
     }
   }
 

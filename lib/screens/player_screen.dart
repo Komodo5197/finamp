@@ -74,9 +74,9 @@ class PlayerScreen extends StatelessWidget {
         initialData: queueService.getQueue(),
         builder: (context, snapshot) {
           if (snapshot.hasData && snapshot.data!.saveState == SavedQueueState.loading) {
-            return buildLoadingScreen(context, null);
+            return buildLoadingScreen(context, null, queueService.cancelQueueLoad);
           } else if (snapshot.hasData && snapshot.data!.saveState == SavedQueueState.failed) {
-            return buildLoadingScreen(context, queueService.retryQueueLoad);
+            return buildLoadingScreen(context, queueService.retryQueueLoad, queueService.cancelQueueLoad);
           } else if (snapshot.hasData && snapshot.data!.currentTrack != null) {
             return _PlayerScreenContent(playerScreen: this);
           } else {
@@ -87,7 +87,7 @@ class PlayerScreen extends StatelessWidget {
     );
   }
 
-  Widget buildLoadingScreen(BuildContext context, void Function()? retryCallback) {
+  Widget buildLoadingScreen(BuildContext context, void Function()? retryCallback, void Function() cancelCallback) {
     double imageSize = min(MediaQuery.widthOf(context), MediaQuery.heightOf(context)) / 2;
 
     return SimpleGestureDetector(
@@ -120,6 +120,8 @@ class PlayerScreen extends StatelessWidget {
                   textAlign: TextAlign.center,
                   style: const TextStyle(fontSize: 20, height: 26 / 20),
                 ),
+                SizedBox(height: 15.0),
+                SimpleButton(text: context.l10n.genericCancel, icon: TablerIcons.cancel, onPressed: cancelCallback),
                 const Spacer(flex: 2),
               ],
             ),
