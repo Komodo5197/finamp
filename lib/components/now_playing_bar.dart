@@ -24,6 +24,7 @@ import 'package:flutter_tabler_icons/flutter_tabler_icons.dart';
 import 'package:get_it/get_it.dart';
 import 'package:simple_gesture_detector/simple_gesture_detector.dart';
 
+import '../extensions/localizations.dart';
 import '../models/jellyfin_models.dart' as jellyfin_models;
 import '../screens/player_screen.dart';
 import '../services/current_album_image_provider.dart';
@@ -66,7 +67,13 @@ class NowPlayingBar extends ConsumerWidget {
     );
   }
 
-  Widget buildLoadingQueueBar(WidgetRef ref, void Function()? retryCallback, void Function() cancelCallback) {
+  Widget buildLoadingQueueBar(
+    WidgetRef ref,
+    SavedQueueState state,
+    void Function()? retryCallback,
+    void Function() cancelCallback,
+  ) {
+    assert(state == SavedQueueState.loading || (state.isFailed && retryCallback != null));
     final progressBackgroundColor = getProgressBackgroundColor(ref).withOpacity(0.5);
     var context = ref.context;
 
@@ -74,7 +81,7 @@ class NowPlayingBar extends ConsumerWidget {
       onTap: retryCallback,
       child: Dismissible(
         key: const Key("NowPlayingBar"),
-        direction: retryCallback == null ? DismissDirection.down : DismissDirection.up,
+        direction: retryCallback == null ? DismissDirection.down : DismissDirection.vertical,
         confirmDismiss: (direction) async {
           if (direction == DismissDirection.down) {
             FeedbackHelper.feedback(FeedbackType.light);
@@ -127,11 +134,12 @@ class NowPlayingBar extends ConsumerWidget {
                           height: albumImageSize,
                           padding: const EdgeInsets.only(left: 12, right: 4),
                           alignment: Alignment.centerLeft,
-                          child: Text(
-                            (retryCallback != null)
-                                ? AppLocalizations.of(context)!.queueRetryMessage
-                                : AppLocalizations.of(context)!.queueLoadingMessage,
-                          ),
+                          child: Text(switch (state) {
+                            SavedQueueState.loading => context.l10n.queueLoadingMessage,
+                            SavedQueueState.failed => context.l10n.queueRetryMessage,
+                            SavedQueueState.failedOversized => context.l10n.queueAutorestoreOversized,
+                            _ => "ERROR",
+                          }),
                         ),
                       ),
                     ],
@@ -543,11 +551,14 @@ class NowPlayingBar extends ConsumerWidget {
                   if (snapshot.hasData &&
                       snapshot.data!.saveState == SavedQueueState.loading &&
                       !usingPlayerSplitScreen) {
-                    return buildLoadingQueueBar(ref, null, queueService.cancelQueueLoad);
-                  } else if (snapshot.hasData &&
-                      snapshot.data!.saveState == SavedQueueState.failed &&
-                      !usingPlayerSplitScreen) {
-                    return buildLoadingQueueBar(ref, queueService.retryQueueLoad, queueService.cancelQueueLoad);
+                    return buildLoadingQueueBar(ref, snapshot.data!.saveState, null, queueService.cancelQueueLoad);
+                  } else if (snapshot.hasData && snapshot.data!.saveState.isFailed && !usingPlayerSplitScreen) {
+                    return buildLoadingQueueBar(
+                      ref,
+                      snapshot.data!.saveState,
+                      queueService.retryQueueLoad,
+                      queueService.cancelQueueLoad,
+                    );
                   } else if (snapshot.hasData && snapshot.data!.currentTrack != null && !usingPlayerSplitScreen) {
                     return buildNowPlayingBar(ref, snapshot.data!.currentTrack!);
                   } else {
