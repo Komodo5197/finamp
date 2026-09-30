@@ -432,7 +432,7 @@ class CarPlayHelper {
               case ContentType.genericArtists:
                 showArtistsTemplate();
               case ContentType.tracks:
-              case ContentType.inPlaylist:
+              case ContentType.inPlaylistOrAlbum:
               case ContentType.inPerformingArtistAlbums:
               case ContentType.inAlbumArtistAlbums:
                 showTracksTemplate();
