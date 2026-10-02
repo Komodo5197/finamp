@@ -1372,6 +1372,7 @@ class DownloadsService {
   /// + genreFiter - only return tracks that have the provided genreID assigned
   Future<List<DownloadStub>> getAllTracks({
     String? nameFilter,
+    String? startingLetter,
     BaseItemDto? relatedTo,
     BaseItemId? viewFilter,
     bool nullableViewFilters = true,
@@ -1391,6 +1392,12 @@ class DownloadsService {
               q.stateEqualTo(DownloadItemState.complete).or().stateEqualTo(DownloadItemState.needsRedownloadComplete),
         )
         .optional(onlyFavorites, (q) => q.anyOf(favoriteIds, (q, v) => q.isarIdEqualTo(v)))
+        .optional(
+          startingLetter != null && startingLetter != "#",
+          (q) => q.nameStartsWith(startingLetter!, caseSensitive: false),
+        )
+        // TODO this logic seems bad, but it matches jellyfin.  Change?
+        .optional(startingLetter != null && startingLetter == "#", (q) => q.nameLessThan("A", caseSensitive: false))
         .optional(nameFilter != null, (q) => q.nameContains(nameFilter!, caseSensitive: false))
         .optional(
           relatedTo != null,

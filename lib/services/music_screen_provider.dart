@@ -367,6 +367,7 @@ Future<List<BaseItemDto>?> loadHomeSectionItemsOffline({
   final searchFilter = request.sortConfig.filters.firstWhereOrNull((x) => x.type == ItemFilterType.searchTerm);
   final genreFilter = request.sortConfig.filters.firstWhereOrNull((x) => x.type == ItemFilterType.genreFilter);
   final artistFilter = request.sortConfig.filters.firstWhereOrNull((x) => x.type == ItemFilterType.artistFilter);
+  final letterFilter = request.sortConfig.filters.firstWhereOrNull((x) => x.type == ItemFilterType.startsWithCharacter);
 
   BaseItemId? libraryId;
   if (request.library == allLibraryPlaceholder) {
@@ -398,6 +399,7 @@ Future<List<BaseItemDto>?> loadHomeSectionItemsOffline({
       // tracks are not stored as collections, so we need to get them differently
       offlineItems = await downloadsService.getAllTracks(
         nameFilter: searchFilter?.extraString.trim(),
+        startingLetter: letterFilter?.extraString,
         viewFilter: libraryId,
         nullableViewFilters: ref.watch(finampSettingsProvider.showDownloadsWithUnknownLibrary),
         onlyFavorites: request.sortConfig.filters.any((filter) => filter.type == ItemFilterType.isFavorite),
@@ -406,6 +408,7 @@ Future<List<BaseItemDto>?> loadHomeSectionItemsOffline({
     } else {
       offlineItems = await downloadsService.getAllCollections(
         nameFilter: searchFilter?.extraString.trim(),
+
         includeItemTypes: [request.tab.itemType ?? BaseItemDtoType.album], //FIXME support allowing multiple types
         // TODO use the filter config for this instead of global(several places)?
         // Might need to refactor sortconfig into some preexising providers to eliminate direct global setting usage
