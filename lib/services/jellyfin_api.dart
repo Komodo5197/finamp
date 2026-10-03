@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:io' show HttpClient, Platform;
 
-import 'package:app_set_id/app_set_id.dart';
 import 'package:chopper/chopper.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:finamp/models/finamp_models.dart';
@@ -17,7 +16,7 @@ import 'jellyfin_api_helper.dart';
 
 part 'jellyfin_api.chopper.dart';
 
-const String defaultFields = "ChildCount,DateCreated,DateLastMediaAdded,Etag,Genres,ParentId,ProviderIds,Tags";
+const String defaultFields = "ChildCount,DateCreated,DateLastMediaAdded,Etag,Genres,ParentId,ProviderIds,Tags,SortName";
 
 @ChopperApi()
 abstract class JellyfinApi extends ChopperService {
@@ -34,7 +33,7 @@ abstract class JellyfinApi extends ChopperService {
   Future<dynamic> getQuickConnectState();
 
   @FactoryConverter(request: JsonConverter.requestFactory, response: JsonConverter.responseFactory)
-  @Get(path: "/QuickConnect/Initiate")
+  @Post(path: "/QuickConnect/Initiate")
   Future<dynamic> initiateQuickConnect();
 
   @FactoryConverter(request: JsonConverter.requestFactory, response: JsonConverter.responseFactory)
@@ -59,6 +58,21 @@ abstract class JellyfinApi extends ChopperService {
   @FactoryConverter(request: JsonConverter.requestFactory, response: JsonConverter.responseFactory)
   @Get(path: "/Items/{id}/Images/Primary")
   Future<dynamic> getAlbumPrimaryImage({@Path() required BaseItemId id, @Query() String format = "webp"});
+
+  @POST(path: "/Items/{itemId}/Images/Primary")
+  Future<Response> setItemPrimaryImage({
+    @Header("Content-Type") String contentType = "image/jpeg",
+    @Path() required BaseItemId itemId,
+    @Body() required String base64Image,
+  });
+
+  @FactoryConverter(request: JsonConverter.requestFactory, response: JsonConverter.responseFactory)
+  @GET(path: "/Users/Me")
+  Future<dynamic> getUser();
+
+  @FactoryConverter(request: JsonConverter.requestFactory, response: JsonConverter.responseFactory)
+  @GET(path: "/Users/{id}")
+  Future<dynamic> getUserById(@Path() String id);
 
   @FactoryConverter(request: JsonConverter.requestFactory, response: JsonConverter.responseFactory)
   @Get(path: "/Users/{id}/Views")
@@ -160,6 +174,15 @@ abstract class JellyfinApi extends ChopperService {
 
     /// Optional. Controls if multi-disc should be returned as separate albums (true) or as a single album (false).
     @Query("CollapseBoxSetItems") bool? collapseMultiDiscAlbums,
+
+    /// Optional. Filter by items whose name is sorted equally than a given input string.
+    @Query("NameStartsWith") String? nameStartsWith,
+
+    /// Optional. Filter by items whose name is sorted equally or greater than a given input string.
+    @Query("NameStartsWithOrGreater") String? nameStartsWithOrGreater,
+
+    /// Optional. Filter by items whose name is equally or lesser than a given input string.
+    @Query("NameLessThan") String? nameLessThan,
   });
 
   @FactoryConverter(request: JsonConverter.requestFactory, response: JsonConverter.responseFactory)
@@ -206,6 +229,20 @@ abstract class JellyfinApi extends ChopperService {
     @Path() required BaseItemId id,
     @Query() required String userId,
     @Query() required int limit,
+    // when requesting Instant Mixes (Jellyfin 10.10.x & 10.11.x), Jellyfin omits the [hasOwnImage] field and other metadata, which leads to us (and Jellyfin Web) falling back to the album image, even though a track image is present.
+    // These parameters help to get more accurate image data
+    @Query() bool? enableImages = true,
+    @Query() List<String>? enableImageTypes = const ["Primary", "Disc", "Thumb", "Art"],
+  });
+
+  @FactoryConverter(request: JsonConverter.requestFactory, response: JsonConverter.responseFactory)
+  @GET(path: "/Albums/{id}/Similar")
+  Future<dynamic> getSimilarAlbums({
+    @Path() required BaseItemId id,
+    @Query() String? userId,
+    @Query() List<String>? excludeArtistIds,
+    @Query() int? limit,
+    @Query() List<String>? fields,
   });
 
   @FactoryConverter(request: JsonConverter.requestFactory, response: JsonConverter.responseFactory)
@@ -219,8 +256,35 @@ abstract class JellyfinApi extends ChopperService {
   });
 
   @FactoryConverter(request: JsonConverter.requestFactory, response: JsonConverter.responseFactory)
+  @Get(path: "/Playlists/{playlistId}/Users/{userId}")
+  Future<dynamic> getPlaylistUser({
+    /// User id.
+    @Path() required String userId,
+
+    /// Playlist id.
+    @Path() required BaseItemId playlistId,
+  });
+
+  @FactoryConverter(request: JsonConverter.requestFactory, response: JsonConverter.responseFactory)
+  @Get(path: "/Playlists/{playlistId}/Users")
+  Future<dynamic> getPlaylistUsers({
+    /// User id.
+    @Path() required String userId,
+
+    /// Playlist id.
+    @Path() required BaseItemId playlistId,
+  });
+
+  @FactoryConverter(request: JsonConverter.requestFactory, response: JsonConverter.responseFactory)
   @Get(path: "/Items/{id}/PlaybackInfo")
   Future<dynamic> getPlaybackInfo({@Path() required BaseItemId id, @Query() required String userId});
+
+  @FactoryConverter(request: JsonConverter.requestFactory, response: JsonConverter.responseFactory)
+  @POST(path: "/Items/{id}/PlaybackInfo")
+  Future<dynamic> submitPlaybackInfo({
+    @Path() required BaseItemId id,
+    @Body() required PlaybackInfoRequest playbackInfoRequest,
+  });
 
   @FactoryConverter(request: JsonConverter.requestFactory)
   @Post(path: "/Items/{itemId}")
@@ -368,6 +432,9 @@ abstract class JellyfinApi extends ChopperService {
 
     /// Optional filter by items that are marked as favorite, or not.
     @Query("isFavorite") bool? isFavorite,
+
+    /// Optional. Filter by items whose name is sorted equally than a given input string.
+    @Query("NameStartsWith") String? nameStartsWith,
   });
 
   @FactoryConverter(request: JsonConverter.requestFactory, response: JsonConverter.responseFactory)
@@ -412,6 +479,9 @@ abstract class JellyfinApi extends ChopperService {
 
     /// Optional filter by items that are marked as favorite, or not.
     @Query("isFavorite") bool? isFavorite,
+
+    /// Optional. Filter by items whose name is sorted equally than a given input string.
+    @Query("NameStartsWith") String? nameStartsWith,
   });
 
   /// Gets all genres from a given item, folder, or the entire library.
@@ -504,8 +574,13 @@ abstract class JellyfinApi extends ChopperService {
   @Get(path: "/System/Endpoint", optionalBody: true)
   Future<Response<dynamic>> pingServer();
 
-  static JellyfinApi create(bool inForeground) {
-    final chopperHttpLogLevel = Level.body; //TODO allow changing the log level in settings (and a debug config file?)
+  static JellyfinApi create({required bool inForeground, required bool verboseLogging}) {
+    // Body logging can be very excessive, so we do not perform it by default.  If in debug mode or configured for verbose
+    // logging, body log foreground requests but keep disabled for verbose getItems calls in background.  If using verbose
+    // logs in debug mode, body log every request.
+    final chopperHttpLogLevel = (kDebugMode && verboseLogging) || ((kDebugMode || verboseLogging) && inForeground)
+        ? Level.body
+        : Level.headers;
 
     final client = ChopperClient(
       client: http.IOClient(
@@ -560,7 +635,11 @@ class JellyfinInterceptor implements Interceptor {
     // Add the request path on to the baseUrl
     baseUri = baseUri.replace(pathSegments: baseUri.pathSegments.followedBy(request.uri.pathSegments));
 
-    return request.copyWith(uri: baseUri, headers: {"Content-Type": "application/json", "Authorization": authHeader});
+    // Preserve an existing multipart/form-data or other explicit Content-Type (e.g., for file uploads)
+    // Do NOT force a Content-Type here; let Chopper/converters set JSON, and leave
+    // multipart or raw uploads (e.g., image POST) untouched so the server
+    // receives the correct boundary or image media type.
+    return request.copyWith(uri: baseUri, headers: {...request.headers, "Authorization": authHeader});
   }
 }
 
@@ -583,13 +662,13 @@ class JellyfinSpecificInterceptor implements Interceptor {
 
     return request.copyWith(
       uri: baseUri,
-      headers: {"Content-Type": "application/json", "Authorization": finampUserHelper.authorizationHeader},
+      headers: {...request.headers, "Authorization": finampUserHelper.authorizationHeader},
     );
   }
 }
 
-/// Creates the X-Emby-Authorization header
-Future<String> getAuthHeader() async {
+/// Creates the Authorization header
+Future<String> getAuthHeader({required String deviceId}) async {
   final notAsciiRegex = RegExp(r'[^\x00-\x7F]+');
 
   final finampUserHelper = GetIt.instance<FinampUserHelper>();
@@ -606,7 +685,7 @@ Future<String> getAuthHeader() async {
 
   authHeader = '${authHeader}Client="Finamp", ';
 
-  final deviceInfo = await getDeviceInfo();
+  final deviceInfo = await getDeviceInfo(deviceId: deviceId);
   authHeader = '${authHeader}Device="${deviceInfo.name}",DeviceId="${deviceInfo.id}", ';
 
   PackageInfo packageInfo = await PackageInfo.fromPlatform();
@@ -619,7 +698,7 @@ Future<String> getAuthHeader() async {
 
 // return type for deviceInfo
 
-Future<DeviceInfo> getDeviceInfo() async {
+Future<DeviceInfo> getDeviceInfo({required String deviceId}) async {
   DeviceInfo info;
   DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
   String idExtension = kDebugMode
@@ -629,12 +708,10 @@ Future<DeviceInfo> getDeviceInfo() async {
       : "";
   if (Platform.isAndroid) {
     AndroidDeviceInfo androidDeviceInfo = await deviceInfo.androidInfo;
-    final appSetId = await AppSetId().getIdentifier();
-    info = DeviceInfo(name: androidDeviceInfo.model, id: "$appSetId-$idExtension");
+    info = DeviceInfo(name: androidDeviceInfo.name, id: "$deviceId-$idExtension");
   } else if (Platform.isIOS) {
     IosDeviceInfo iosDeviceInfo = await deviceInfo.iosInfo;
-    final appSetId = await AppSetId().getIdentifier();
-    info = DeviceInfo(name: iosDeviceInfo.name, id: "$appSetId-$idExtension");
+    info = DeviceInfo(name: iosDeviceInfo.name, id: "$deviceId-$idExtension");
   } else if (Platform.isWindows) {
     WindowsDeviceInfo windowsDeviceInfo = await deviceInfo.windowsInfo;
     final windowsId = windowsDeviceInfo.deviceId;

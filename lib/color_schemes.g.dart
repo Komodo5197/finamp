@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:dynamic_color/dynamic_color.dart';
+import 'package:finamp/services/finamp_settings_helper.dart';
 
 const jellyfinBlueColor = Color(0xFF00A4DC);
 const jellyfinPurpleColor = Color(0xFFAA5CC3);
@@ -84,3 +86,24 @@ const darkColorScheme = ColorScheme(
   outlineVariant: Color(0xFF41484D),
   scrim: Color(0xFF000000),
 );
+
+/// If [color] is provided -> returns a generated color scheme
+/// otherwise falls back to default color schemes
+/// [lightColorScheme] or [darkColorScheme]
+ColorScheme getColorScheme(Color? color, Brightness brightness, bool amoledTheme) {
+  ColorScheme scheme = brightness == Brightness.dark ? darkColorScheme : lightColorScheme;
+
+  if (color != null) {
+    scheme = ColorScheme.fromSeed(
+      seedColor: color,
+      brightness: brightness,
+      dynamicSchemeVariant: DynamicSchemeVariant.fidelity,
+    );
+  }
+
+  if (amoledTheme && brightness == Brightness.dark) {
+    scheme = scheme.copyWith(background: Color(0xFF000000), surface: Color(0xFF000000));
+  }
+
+  return scheme;
+}

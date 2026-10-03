@@ -1,4 +1,6 @@
+import 'package:collection/collection.dart';
 import 'package:finamp/models/finamp_models.dart';
+import 'package:finamp/services/item_by_id_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:get_it/get_it.dart';
 import 'package:logging/logging.dart';
@@ -18,19 +20,25 @@ class MetadataProvider {
   static const speedControlLongTrackDuration = Duration(minutes: 15);
   static const speedControlLongAlbumDuration = Duration(hours: 3);
 
-  final MediaSourceInfo mediaSourceInfo;
+  final PlaybackInfoResponse playbackInfo;
+  final BaseItemDto item;
   LyricDto? lyrics;
   bool isDownloaded;
   bool qualifiesForPlaybackSpeedControl;
-  double? parentNormalizationGain;
+  double? albumNormalizationGain;
+  List<BaseItemPerson>? people;
 
   MetadataProvider({
-    required this.mediaSourceInfo,
+    required this.item,
+    required this.playbackInfo,
     this.lyrics,
     this.isDownloaded = false,
     this.qualifiesForPlaybackSpeedControl = false,
-    this.parentNormalizationGain,
+    this.albumNormalizationGain,
+    this.people,
   });
+
+  MediaSourceInfo get mediaSourceInfo => playbackInfo.mediaSources!.first;
 
   bool get hasLyrics => mediaSourceInfo.mediaStreams.any((e) => e.type == "Lyric");
 }
@@ -39,7 +47,7 @@ final AutoDisposeFutureProviderFamily<MetadataProvider?, BaseItemDto> metadataPr
     .family<MetadataProvider?, BaseItemDto>((ref, item) async {
       Future<BaseItemDto?>? parentFuture;
       if (item.parentId != null) {
-        parentFuture = ref.watch(albumProvider(item.parentId!).future);
+        parentFuture = ref.watch(itemByIdProvider(item.parentId!).future);
       }
 
       final jellyfinApiHelper = GetIt.instance<JellyfinApiHelper>();
@@ -47,8 +55,8 @@ final AutoDisposeFutureProviderFamily<MetadataProvider?, BaseItemDto> metadataPr
 
       metadataProviderLogger.fine("Fetching metadata for '${item.name}' (${item.id})");
 
-      MediaSourceInfo? playbackInfo;
-      MediaSourceInfo? localPlaybackInfo;
+      PlaybackInfoResponse? playbackInfo;
+      PlaybackInfoResponse? localPlaybackInfo;
 
       final downloadStub = await downloadsService.getTrackInfo(id: item.id);
       if (downloadStub != null) {
@@ -56,44 +64,72 @@ final AutoDisposeFutureProviderFamily<MetadataProvider?, BaseItemDto> metadataPr
         if (downloadItem != null && downloadItem.state.isComplete) {
           metadataProviderLogger.fine("Got offline metadata for '${item.name}'");
           var profile = downloadItem.fileTranscodingProfile;
+          var audioStream =
+              downloadItem.baseItem!.mediaStreams?.firstWhereOrNull((s) => s.type == "Audio") ??
+              downloadItem.baseItem!.mediaStreams?.firstOrNull;
           // We could explicitly get a mediaSource of type Default, but just grabbing
           // the first seems to generally work?
-          var codec = profile?.codec != FinampTranscodingCodec.original
-              ? profile?.codec.name
-              : downloadItem.baseItem!.mediaSources?.first.container;
+          var codec = profile?.codec != FinampTranscodingCodec.original ? profile?.codec.name : audioStream?.codec;
+          var container = profile?.codec != FinampTranscodingCodec.original
+              ? profile?.codec.container
+              : downloadItem.baseItem!.mediaSources?.firstOrNull?.container;
           var bitrate = profile?.codec != FinampTranscodingCodec.original
               ? profile?.stereoBitrate
-              : downloadItem.baseItem!.mediaSources?.first.bitrate;
+              : downloadItem.baseItem!.mediaSources?.firstOrNull?.bitrate;
 
           // We cannot create accurate MediaStreams for a transcoded item,so
           // just return the lyrics stream, as those are not affected and will not
           // be shown if the mediaStream is not present
           List<MediaStream> mediaStream = profile?.codec != FinampTranscodingCodec.original
-              ? downloadItem.baseItem!.mediaStreams?.where((x) => x.type == "Lyric").toList() ?? []
+              ? [
+                      MediaStream(
+                        index: 0,
+                        type: "Audio",
+                        codec: codec,
+                        bitRate: bitrate,
+                        sampleRate: null,
+                        channels: null,
+                        // Lossy formats do not have a fixed bit depth
+                        //bitDepth: audioStream?.bitDepth,
+                        bitDepth: null,
+                        isInterlaced: false,
+                        isDefault: true,
+                        isForced: false,
+                        isExternal: false,
+                        isTextSubtitleStream: false,
+                        supportsExternalStream: false,
+                      ),
+                    ]
+                    .followedBy(downloadItem.baseItem!.mediaStreams?.where((x) => x.type == "Lyric").toList() ?? [])
+                    .toList()
               : downloadItem.baseItem!.mediaStreams ?? [];
 
-          localPlaybackInfo = MediaSourceInfo(
-            id: downloadItem.baseItem!.id,
-            protocol: "File",
-            type: "Default",
-            isRemote: false,
-            supportsTranscoding: false,
-            supportsDirectStream: false,
-            supportsDirectPlay: true,
-            isInfiniteStream: false,
-            requiresOpening: false,
-            requiresClosing: false,
-            requiresLooping: false,
-            supportsProbing: false,
-            mediaStreams: mediaStream,
-            readAtNativeFramerate: false,
-            ignoreDts: false,
-            ignoreIndex: false,
-            genPtsInput: false,
-            bitrate: bitrate,
-            container: codec,
-            name: downloadItem.baseItem!.mediaSources?.first.name,
-            size: await downloadsService.getFileSize(downloadStub),
+          localPlaybackInfo = PlaybackInfoResponse(
+            mediaSources: [
+              MediaSourceInfo(
+                id: downloadItem.baseItem!.id,
+                protocol: "File",
+                type: "Default",
+                isRemote: false,
+                supportsTranscoding: false,
+                supportsDirectStream: false,
+                supportsDirectPlay: true,
+                isInfiniteStream: false,
+                requiresOpening: false,
+                requiresClosing: false,
+                requiresLooping: false,
+                supportsProbing: false,
+                mediaStreams: mediaStream,
+                readAtNativeFramerate: false,
+                ignoreDts: false,
+                ignoreIndex: false,
+                genPtsInput: false,
+                bitrate: bitrate,
+                container: container,
+                name: downloadItem.baseItem!.mediaSources?.first.name,
+                size: await downloadsService.getFileSize(downloadStub),
+              ),
+            ],
           );
         }
       }
@@ -108,22 +144,34 @@ final AutoDisposeFutureProviderFamily<MetadataProvider?, BaseItemDto> metadataPr
           "Fetching metadata for '${item.name}' (${item.id}) from server due to missing attributes",
         );
         try {
-          playbackInfo = (await jellyfinApiHelper.getPlaybackInfo(item.id))?.first;
+          playbackInfo = await jellyfinApiHelper.getPlaybackInfo(item.id);
         } catch (e) {
           metadataProviderLogger.severe("Failed to fetch metadata for '${item.name}' (${item.id})", e);
           return null;
         }
 
         // update **PARTS** of playbackInfo with localPlaybackInfo if available
-        if (localPlaybackInfo != null && playbackInfo != null) {
-          playbackInfo.protocol = localPlaybackInfo.protocol;
-          playbackInfo.bitrate = localPlaybackInfo.bitrate;
+        if (localPlaybackInfo != null && (playbackInfo.mediaSources?.isNotEmpty ?? false)) {
+          playbackInfo.mediaSources!.first.protocol = localPlaybackInfo.mediaSources!.first.protocol;
+          playbackInfo.mediaSources!.first.bitrate = localPlaybackInfo.mediaSources!.first.bitrate;
+          var remoteBitDepth = playbackInfo.mediaSources!.first.mediaStreams
+              .firstWhereOrNull((x) => x.type == "Audio")
+              ?.bitDepth;
           // Use lyrics mediastream from online item, but take all other streams
           // from downloaded item
-          playbackInfo.mediaStreams = playbackInfo.mediaStreams.where((x) => x.type == "Lyric").toList();
-          playbackInfo.mediaStreams.addAll(localPlaybackInfo.mediaStreams.where((x) => x.type != "Lyric"));
-          playbackInfo.container = localPlaybackInfo.container;
-          playbackInfo.size = localPlaybackInfo.size;
+          playbackInfo.mediaSources!.first.mediaStreams = playbackInfo.mediaSources!.first.mediaStreams
+              .where((x) => x.type == "Lyric")
+              .toList();
+          playbackInfo.mediaSources!.first.mediaStreams.addAll(
+            localPlaybackInfo.mediaSources!.first.mediaStreams.where((x) => x.type != "Lyric"),
+          );
+          var audioStream = playbackInfo.mediaSources!.first.mediaStreams.firstWhereOrNull((x) => x.type == "Audio");
+          // we don't specify a bit depth when downloading, so the remote bit depth should be accurate
+          if (audioStream != null) {
+            audioStream.bitDepth = remoteBitDepth;
+          }
+          playbackInfo.mediaSources!.first.container = localPlaybackInfo.mediaSources!.first.container;
+          playbackInfo.mediaSources!.first.size = localPlaybackInfo.mediaSources!.first.size;
         }
       }
 
@@ -138,10 +186,24 @@ final AutoDisposeFutureProviderFamily<MetadataProvider?, BaseItemDto> metadataPr
       }
 
       final metadata = MetadataProvider(
-        mediaSourceInfo: playbackInfo,
+        item: item,
+        playbackInfo: playbackInfo,
         isDownloaded: localPlaybackInfo != null,
-        parentNormalizationGain: parent?.normalizationGain,
+        albumNormalizationGain: parent?.normalizationGain,
+        people: item.people,
       );
+
+      final chipConfig = ref.watch(finampSettingsProvider.featureChipsConfiguration);
+      if (!ref.watch(finampSettingsProvider.isOffline) &&
+          chipConfig.enabled &&
+          chipConfig.features.contains(FinampFeatureChipType.additionalPeople)) {
+        try {
+          final withPeople = await jellyfinApiHelper.getItems(itemIds: [item.id], fields: "People");
+          metadata.people = withPeople?.firstOrNull?.people;
+        } catch (e) {
+          metadataProviderLogger.warning("Failed to fetch people for '${item.name}' (${item.id})", e);
+        }
+      }
 
       for (final genre in item.genres ?? []) {
         if (MetadataProvider.speedControlGenres.contains(genre.toLowerCase())) {
@@ -194,28 +256,4 @@ final AutoDisposeFutureProviderFamily<MetadataProvider?, BaseItemDto> metadataPr
       );
 
       return metadata;
-    });
-
-final AutoDisposeFutureProviderFamily<BaseItemDto?, BaseItemId> albumProvider = FutureProvider.autoDispose
-    .family<BaseItemDto?, BaseItemId>((ref, parentId) async {
-      final jellyfinApiHelper = GetIt.instance<JellyfinApiHelper>();
-      final downloadsService = GetIt.instance<DownloadsService>();
-
-      if (ref.watch(finampSettingsProvider.isOffline)) {
-        final parentInfo = await downloadsService.getCollectionInfo(id: parentId);
-        if (parentInfo == null) {
-          metadataProviderLogger.warning("Couldn't find parent collection '$parentId' in offline mode");
-        } else if (parentInfo.baseItem == null) {
-          metadataProviderLogger.warning("Offline metadata for '$parentId' does not include jellyfin BaseItemDto");
-        } else {
-          return parentInfo.baseItem;
-        }
-      } else {
-        try {
-          return await jellyfinApiHelper.getItemById(parentId);
-        } catch (e) {
-          metadataProviderLogger.warning("Failed to get parent item '$parentId'", e);
-        }
-      }
-      return null;
     });

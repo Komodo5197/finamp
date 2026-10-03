@@ -9,9 +9,12 @@
 library;
 
 import 'package:collection/collection.dart';
+import 'package:finamp/components/global_snackbar.dart';
 import 'package:finamp/l10n/app_localizations.dart';
 import 'package:finamp/models/finamp_models.dart';
+import 'package:finamp/services/finamp_user_helper.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_tabler_icons/flutter_tabler_icons.dart';
 import 'package:hive_ce/hive.dart';
 import 'package:json_annotation/json_annotation.dart';
@@ -28,13 +31,43 @@ class BaseItemIdConverter extends JsonConverter<BaseItemId, String> {
   String toJson(BaseItemId object) => object.raw;
 }
 
-extension type BaseItemId._(String raw) {
+class LibraryIdConverter extends JsonConverter<LibraryId, String> {
+  const LibraryIdConverter();
+
+  @override
+  LibraryId fromJson(String json) => LibraryId(json);
+
+  @override
+  String toJson(LibraryId object) => object.raw;
+}
+
+extension type BaseItemId._(String raw) implements LibraryId {
   /// Construct a BaseItemDto id from a raw string.  Please be sure you have a valid ID before using, and
   /// if you might not, consider the invalid ID's scope and if you can use an alternative, such as null
-  BaseItemId(this.raw);
-
-  String operator +(BaseItemId other) => raw + other.raw;
+  const BaseItemId(this.raw);
 }
+
+extension type LibraryId._(String raw) {
+  /// Construct a BaseItemDto id from a raw string.  Please be sure you have a valid ID before using, and
+  /// if you might not, consider the invalid ID's scope and if you can use an alternative, such as null
+  const LibraryId(this.raw);
+
+  BaseItemId? resolve(Ref ref) => switch (this) {
+    currentLibraryPlaceholder => ref.watch(FinampUserHelper.finampCurrentUserProvider)?.currentViewId,
+    allLibraryPlaceholder => null,
+    _ => this as BaseItemId,
+  };
+
+  BaseItemId? resolve2(WidgetRef ref) => switch (this) {
+    currentLibraryPlaceholder => ref.watch(FinampUserHelper.finampCurrentUserProvider)?.currentViewId,
+    allLibraryPlaceholder => null,
+    _ => this as BaseItemId,
+  };
+}
+
+// These get saved into home screen configuration and cannot be modified.
+const LibraryId allLibraryPlaceholder = LibraryId("finamp-all-libraries-placeholder");
+const LibraryId currentLibraryPlaceholder = LibraryId("finamp-current-library-placeholder");
 
 /// An abstract class to implement converting runTimeTicks into a duration.
 /// Ideally, we'd hold runTimeTicks here, but that would break offline storage
@@ -773,43 +806,15 @@ class DeviceProfile {
   DeviceProfile({
     this.name,
     this.id,
-    this.identification,
-    this.friendlyName,
-    this.manufacturer,
-    this.manufacturerUrl,
-    this.modelName,
-    this.modelDescription,
-    this.modelNumber,
-    this.modelUrl,
-    this.serialNumber,
-    required this.enableAlbumArtInDidl,
-    required this.enableSingleAlbumArtLimit,
-    required this.enableSingleSubtitleLimit,
-    this.supportedMediaTypes,
-    this.userId,
-    this.albumArtPn,
-    required this.maxAlbumArtWidth,
-    required this.maxAlbumArtHeight,
-    this.maxIconWidth,
-    this.maxIconHeight,
     this.maxStreamingBitrate,
     this.maxStaticBitrate,
     this.musicStreamingTranscodingBitrate,
     this.maxStaticMusicBitrate,
-    this.sonyAggregationFlags,
-    this.protocolInfo,
-    required this.timelineOffsetSeconds,
-    required this.requiresPlainVideoItems,
-    required this.requiresPlainFolders,
-    required this.enableMSMediaReceiverRegistrar,
-    required this.ignoreTranscodeByteRangeRequests,
-    this.xmlRootAttributes,
-    this.directPlayProfiles,
-    this.transcodingProfiles,
-    this.containerProfiles,
-    this.codecProfiles,
-    this.responseProfiles,
-    this.subtitleProfiles,
+    this.directPlayProfiles = const [],
+    this.transcodingProfiles = const [],
+    this.containerProfiles = const [],
+    this.codecProfiles = const [],
+    this.subtitleProfiles = const [],
   });
 
   /// Gets or sets the Name.
@@ -821,80 +826,99 @@ class DeviceProfile {
   String? id;
 
   /// Gets or sets the Identification.
-  @HiveField(2)
-  DeviceIdentification? identification;
+  // @Deprecated("removed from API")
+  // @HiveField(2)
+  // DeviceIdentification? identification;
 
   /// Gets or sets the FriendlyName.
-  @HiveField(3)
-  String? friendlyName;
+  // @Deprecated("removed from API")
+  // @HiveField(3)
+  // String? friendlyName;
 
   /// Gets or sets the Manufacturer.
-  @HiveField(4)
-  String? manufacturer;
+  // @Deprecated("removed from API")
+  // @HiveField(4)
+  // String? manufacturer;
 
   /// Gets or sets the ManufacturerUrl.
-  @HiveField(5)
-  String? manufacturerUrl;
+  // @Deprecated("removed from API")
+  // @HiveField(5)
+  // String? manufacturerUrl;
 
   /// Gets or sets the ModelName.
-  @HiveField(6)
-  String? modelName;
+  // @Deprecated("removed from API")
+  // @HiveField(6)
+  // String? modelName;
 
   /// Gets or sets the ModelDescription.
-  @HiveField(7)
-  String? modelDescription;
+  // @Deprecated("removed from API")
+  // @HiveField(7)
+  // String? modelDescription;
 
   /// Gets or sets the ModelNumber.
-  @HiveField(8)
-  String? modelNumber;
+  // @Deprecated("removed from API")
+  // @HiveField(8)
+  // String? modelNumber;
 
   /// Gets or sets the ModelUrl.
-  @HiveField(9)
-  String? modelUrl;
+  // @Deprecated("removed from API")
+  // @HiveField(9)
+  // String? modelUrl;
 
   /// Gets or sets the SerialNumber.
-  @HiveField(10)
-  String? serialNumber;
+  // @Deprecated("removed from API")
+  // @HiveField(10)
+  // String? serialNumber;
 
   /// Gets or sets a value indicating whether EnableAlbumArtInDidl.
-  @HiveField(11)
-  bool enableAlbumArtInDidl;
+  // @Deprecated("removed from API")
+  // @HiveField(11)
+  // bool enableAlbumArtInDidl;
 
   /// Gets or sets a value indicating whether EnableSingleAlbumArtLimit.
-  @HiveField(12)
-  bool enableSingleAlbumArtLimit;
+  // @Deprecated("removed from API")
+  // @HiveField(12)
+  // bool enableSingleAlbumArtLimit;
 
   /// Gets or sets a value indicating whether EnableSingleSubtitleLimit.
-  @HiveField(13)
-  bool enableSingleSubtitleLimit;
+  // @Deprecated("removed from API")
+  // @HiveField(13)
+  // bool enableSingleSubtitleLimit;
 
   /// Gets or sets the SupportedMediaTypes.
-  @HiveField(14)
-  String? supportedMediaTypes;
+  // @Deprecated("removed from API")
+  // @HiveField(14)
+  // String? supportedMediaTypes;
 
   /// Gets or sets the UserId.
-  @HiveField(15)
-  String? userId;
+  // @Deprecated("removed from API")
+  // @HiveField(15)
+  // String? userId;
 
   /// Gets or sets the AlbumArtPn.
-  @HiveField(16)
-  String? albumArtPn;
+  // @Deprecated("removed from API")
+  // @HiveField(16)
+  // String? albumArtPn;
 
   /// Gets or sets the MaxAlbumArtWidth.
-  @HiveField(17)
-  int maxAlbumArtWidth;
+  // @Deprecated("removed from API")
+  // @HiveField(17)
+  // int maxAlbumArtWidth;
 
   /// Gets or sets the MaxAlbumArtHeight.
-  @HiveField(18)
-  int maxAlbumArtHeight;
+  // @Deprecated("removed from API")
+  // @HiveField(18)
+  // int maxAlbumArtHeight;
 
   /// Gets or sets the MaxIconWidth.
-  @HiveField(19)
-  int? maxIconWidth;
+  // @Deprecated("removed from API")
+  // @HiveField(19)
+  // int? maxIconWidth;
 
   /// Gets or sets the MaxIconHeight.
-  @HiveField(20)
-  int? maxIconHeight;
+  // @Deprecated("removed from API")
+  // @HiveField(20)
+  // int? maxIconHeight;
 
   /// Gets or sets the MaxStreamingBitrate.
   @HiveField(21)
@@ -914,60 +938,69 @@ class DeviceProfile {
 
   /// Gets or sets the content of the aggregationFlags element in the
   /// urn:schemas-sonycom:av namespace.
-  @HiveField(25)
-  String? sonyAggregationFlags;
+  // @Deprecated("removed from API")
+  // @HiveField(25)
+  // String? sonyAggregationFlags;
 
   /// Gets or sets the ProtocolInfo.
-  @HiveField(26)
-  String? protocolInfo;
+  // @Deprecated("removed from API")
+  // @HiveField(26)
+  // String? protocolInfo;
 
   /// Gets or sets the TimelineOffsetSeconds.
-  @HiveField(27)
-  int timelineOffsetSeconds;
+  // @Deprecated("removed from API")
+  // @HiveField(27)
+  // int timelineOffsetSeconds;
 
   /// Gets or sets a value indicating whether RequiresPlainVideoItems.
-  @HiveField(28)
-  bool requiresPlainVideoItems;
+  // @Deprecated("removed from API")
+  // @HiveField(28)
+  // bool requiresPlainVideoItems;
 
   /// Gets or sets a value indicating whether RequiresPlainFolders.
-  @HiveField(29)
-  bool requiresPlainFolders;
+  // @Deprecated("removed from API")
+  // @HiveField(29)
+  // bool requiresPlainFolders;
 
   /// Gets or sets a value indicating whether EnableMSMediaReceiverRegistrar.
-  @HiveField(30)
-  bool enableMSMediaReceiverRegistrar;
+  // @Deprecated("removed from API")
+  // @HiveField(30)
+  // bool enableMSMediaReceiverRegistrar;
 
   /// Gets or sets a value indicating whether IgnoreTranscodeByteRangeRequests.
-  @HiveField(31)
-  bool ignoreTranscodeByteRangeRequests;
+  // @Deprecated("removed from API")
+  // @HiveField(31)
+  // bool ignoreTranscodeByteRangeRequests;
 
   /// Gets or sets the XmlRootAttributes.
-  @HiveField(32)
-  List<XmlAttribute>? xmlRootAttributes;
+  // @Deprecated("removed from API")
+  // @HiveField(32)
+  // List<XmlAttribute>? xmlRootAttributes;
 
   /// Gets or sets the direct play profiles.
   @HiveField(33)
-  List<DirectPlayProfile>? directPlayProfiles;
+  List<DirectPlayProfile> directPlayProfiles;
 
   /// Gets or sets the transcoding profiles.
   @HiveField(34)
-  List<TranscodingProfile>? transcodingProfiles;
+  List<TranscodingProfile> transcodingProfiles;
 
   /// Gets or sets the ContainerProfiles.
   @HiveField(35)
-  List<ContainerProfile>? containerProfiles;
+  List<ContainerProfile> containerProfiles;
 
   /// Gets or sets the CodecProfiles.
   @HiveField(36)
-  List<CodecProfile>? codecProfiles;
+  List<CodecProfile> codecProfiles;
 
   /// Gets or sets the ResponseProfiles.
-  @HiveField(37)
-  List<ResponseProfile>? responseProfiles;
+  // @Deprecated("removed from API")
+  // @HiveField(37)
+  // List<ResponseProfile>? responseProfiles;
 
   /// Gets or sets the SubtitleProfiles.
   @HiveField(38)
-  List<SubtitleProfile>? subtitleProfiles;
+  List<SubtitleProfile> subtitleProfiles;
 
   factory DeviceProfile.fromJson(Map<String, dynamic> json) => _$DeviceProfileFromJson(json);
   Map<String, dynamic> toJson() => _$DeviceProfileToJson(this);
@@ -1078,31 +1111,50 @@ class DirectPlayProfile {
 
   /// Enum: "Audio" "Video" "Photo"
   @HiveField(3)
-  String type;
+  DlnaProfileType type;
 
   factory DirectPlayProfile.fromJson(Map<String, dynamic> json) => _$DirectPlayProfileFromJson(json);
   Map<String, dynamic> toJson() => _$DirectPlayProfileToJson(this);
+}
+
+@HiveType(typeId: 103)
+enum DlnaProfileType {
+  @HiveField(0)
+  audio("Audio"),
+  @HiveField(1)
+  lyric("Lyric"),
+  @HiveField(2)
+  video("Video"),
+  @HiveField(3)
+  subtitle("Subtitle"),
+  @HiveField(4)
+  photo("Photo");
+
+  const DlnaProfileType(this.jellyfinName);
+
+  final String jellyfinName;
 }
 
 @JsonSerializable(fieldRename: FieldRename.pascal, explicitToJson: true, anyMap: true)
 @HiveType(typeId: 22)
 class TranscodingProfile {
   TranscodingProfile({
-    this.container,
     required this.type,
-    this.videoCodec,
-    this.audioCodec,
-    this.protocol,
-    required this.estimateContentLength,
-    required this.enableMpegtsM2TsMode,
-    required this.transcodeSeekInfo,
-    required this.copyTimestamps,
     required this.context,
-    required this.maxAudioChannels,
-    required this.minSegments,
-    required this.segmentLength,
-    required this.breakOnNonKeyFrames,
-    required this.enableSubtitlesInManifest,
+    required this.container,
+    this.minSegments = 1,
+    this.audioCodec = "aac",
+    this.videoCodec = "mp4",
+    this.protocol,
+    this.estimateContentLength = false,
+    this.enableMpegtsM2TsMode = false,
+    this.transcodeSeekInfo = "Auto",
+    this.copyTimestamps = true,
+    this.segmentLength = 0,
+    this.breakOnNonKeyFrames = false,
+    this.enableSubtitlesInManifest = true,
+    this.maxAudioChannels,
+    this.conditions = const [],
   });
 
   @HiveField(0)
@@ -1110,29 +1162,29 @@ class TranscodingProfile {
 
   /// Enum: "Audio" "Video" "Photo"
   @HiveField(1)
-  String type;
+  DlnaProfileType type;
 
   @HiveField(2)
-  String? videoCodec;
+  String videoCodec;
 
   @HiveField(3)
-  String? audioCodec;
+  String audioCodec;
 
   @HiveField(4)
   String? protocol;
 
   @HiveField(5)
-  bool estimateContentLength;
+  bool? estimateContentLength;
 
   @HiveField(6)
-  bool enableMpegtsM2TsMode;
+  bool? enableMpegtsM2TsMode;
 
   /// Enum: "Auto" "Bytes"
   @HiveField(7)
-  String transcodeSeekInfo;
+  String? transcodeSeekInfo;
 
   @HiveField(8)
-  bool copyTimestamps;
+  bool? copyTimestamps;
 
   /// Enum: "Streaming" "Static"
   @HiveField(9)
@@ -1142,18 +1194,19 @@ class TranscodingProfile {
   String? maxAudioChannels;
 
   @HiveField(11)
-  int minSegments;
+  int? minSegments;
 
   @HiveField(12)
-  int segmentLength;
+  int? segmentLength;
 
   @HiveField(13)
-  bool breakOnNonKeyFrames;
-
-  // Below fields were added during null safety migration (0.5.0)
+  bool? breakOnNonKeyFrames;
 
   @HiveField(14)
-  bool enableSubtitlesInManifest;
+  bool? enableSubtitlesInManifest;
+
+  @HiveField(15)
+  List<ProfileCondition> conditions;
 
   factory TranscodingProfile.fromJson(Map<String, dynamic> json) => _$TranscodingProfileFromJson(json);
   Map<String, dynamic> toJson() => _$TranscodingProfileToJson(this);
@@ -1385,7 +1438,6 @@ class BaseItemDto with RunTimeTickDuration {
     this.albumArtist,
     this.albumArtists,
     this.seasonName,
-    this.mediaStreams,
     this.partCount,
     this.imageTags,
     this.backdropImageTags,
@@ -1458,6 +1510,7 @@ class BaseItemDto with RunTimeTickDuration {
     this.audio,
     this.normalizationGain,
     this.hasLyrics,
+    this.albumNormalizationGain,
   });
 
   /// Gets or sets the name.
@@ -1772,9 +1825,10 @@ class BaseItemDto with RunTimeTickDuration {
   @HiveField(79)
   String? seasonName;
 
-  /// Gets or sets the media streams.
-  @HiveField(80)
-  List<MediaStream>? mediaStreams;
+  // Gets or sets the media streams.
+  // This field is removed in favor of mediaSources.first.mediaStreams.
+  //@HiveField(80)
+  //List<MediaStream>? mediaStreams;
 
   /// Gets or sets the part count.
   @HiveField(81)
@@ -2059,6 +2113,9 @@ class BaseItemDto with RunTimeTickDuration {
   @HiveField(152)
   bool? hasLyrics;
 
+  @HiveField(153)
+  double? albumNormalizationGain;
+
   /// Custom helper field to determine if the BaseItemDto was created in offline mode
   bool? finampOffline;
 
@@ -2084,6 +2141,8 @@ class BaseItemDto with RunTimeTickDuration {
     return null;
   }
 
+  List<MediaStream>? get mediaStreams => mediaSources?.firstOrNull?.mediaStreams;
+
   /// Whether or not the item is an artist
   bool get isArtist => type == "MusicArtist";
 
@@ -2105,7 +2164,10 @@ class BaseItemDto with RunTimeTickDuration {
     }
 
     if (type == "Audio") {
-      return name!.toLowerCase();
+      // The sortName has track numbers and whatnot, so we need to use the regular name
+      // This means the server sort we need to match in the tracks tab for jump to letter to work
+      // is a naive sort which does not strip diacritics or force lower case.
+      return name!;
     }
 
     // https://github.com/jellyfin/jellyfin/blob/054f42332d8e0c45fb899eeaef982aa0fd549397/MediaBrowser.Model/Configuration/ServerConfiguration.cs#L129
@@ -2150,11 +2212,27 @@ class BaseItemDto with RunTimeTickDuration {
         other.blurHash == blurHash &&
         other.mediaSources?.length == mediaSources?.length &&
         other.mediaStreams?.length == mediaStreams?.length &&
+        other.people?.length == people?.length &&
         other.normalizationGain == normalizationGain &&
+        other.albumNormalizationGain == albumNormalizationGain &&
         other.playlistItemId == playlistItemId;
   }
 
   DownloadItemType get downloadType => BaseItemDtoType.fromItem(this).downloadType!;
+
+  static const _explicitRatings = [
+    "XXX",
+    "16",
+    "18",
+    "21",
+    "FSK 16",
+    "FSK-16",
+    "FSK 18",
+    "FSK-18",
+    "E",
+    "Explicit",
+  ]; // the last two don't exist yet, but could easily be added server-side
+  bool get isExplicit => _explicitRatings.contains(officialRating) || _explicitRatings.contains(customRating);
 
   // BaseItemDtos with the same id should be considered equal so that Providers
   // taking the BaseItemDto as an argument will be shared across all instances
@@ -2384,7 +2462,7 @@ class MediaSourceInfo with RunTimeTickDuration {
   /// an issue as they are not counted in the size. Attachments are also not
   /// counted, as [mediaStreams] doesn't seem to note their size.
   int transcodedSize(int Function(int channels) bitrateChannels) {
-    final channels = mediaStreams.firstWhere((element) => element.type == "Audio").channels ?? 2;
+    final channels = mediaStreams.firstWhereOrNull((element) => element.type == "Audio")?.channels ?? 2;
     final bitrate = bitrateChannels(channels);
 
     // Divide by 8 to get bytes/sec
@@ -2696,6 +2774,8 @@ class NameLongIdPair {
 
   factory NameLongIdPair.fromJson(Map<String, dynamic> json) => _$NameLongIdPairFromJson(json);
   Map<String, dynamic> toJson() => _$NameLongIdPairToJson(this);
+
+  factory NameLongIdPair.from(BaseItemDto item) => NameLongIdPair(name: item.name, id: item.id);
 }
 
 @JsonSerializable(fieldRename: FieldRename.pascal, explicitToJson: true, anyMap: true, includeIfNull: false)
@@ -3203,13 +3283,21 @@ enum SortBy {
   @HiveField(14)
   runtime,
   @HiveField(15)
-  defaultOrder;
+  defaultOrder,
+  @HiveField(16)
+  inAlbumOrPlaylist;
 
-  static List<SortBy> defaultsFor({required TabContentType type, bool includeDefaultOrder = false}) {
+  bool get onlineOnly => switch (this) {
+    SortBy.datePlayed => true,
+    SortBy.playCount => true,
+    _ => false,
+  };
+
+  static List<SortBy> defaultsFor({required BaseItemDtoType? type, bool includeDefaultOrder = false}) {
     List<SortBy> options;
 
     switch (type) {
-      case TabContentType.tracks:
+      case BaseItemDtoType.track:
         options = [
           SortBy.sortName,
           SortBy.album,
@@ -3224,7 +3312,7 @@ enum SortBy {
           SortBy.runtime,
           SortBy.random,
         ];
-      case TabContentType.albums:
+      case BaseItemDtoType.album:
         options = [
           SortBy.sortName,
           SortBy.albumArtist,
@@ -3236,8 +3324,8 @@ enum SortBy {
           SortBy.runtime,
           SortBy.random,
         ];
-      case TabContentType.playlists:
-      case TabContentType.artists:
+      case BaseItemDtoType.playlist:
+      case BaseItemDtoType.artist:
         options = [
           SortBy.sortName,
           //SortBy.datePlayed,
@@ -3245,8 +3333,12 @@ enum SortBy {
           SortBy.runtime,
           SortBy.random,
         ];
-      case TabContentType.genres:
+      case BaseItemDtoType.collection:
+        options = [SortBy.sortName, SortBy.datePlayed, SortBy.dateCreated, SortBy.runtime, SortBy.random];
+      case BaseItemDtoType.genre:
         options = [SortBy.sortName, SortBy.dateCreated, SortBy.random];
+      default:
+        options = [SortBy.sortName, SortBy.random];
     }
     if (includeDefaultOrder) {
       options.insert(0, SortBy.defaultOrder);
@@ -3259,239 +3351,122 @@ enum SortBy {
   /// function, the same input would return "Album".
   @override
   @Deprecated("Use toLocalisedString when possible")
-  String toString() => _humanReadableName(this);
+  String toString() => toLocalisedString(GlobalSnackbar.requireL10n);
 
-  String toLocalisedString(BuildContext context) => _humanReadableLocalisedName(this, context);
+  String toLocalisedString(AppLocalizations l10n) {
+    return switch (this) {
+      SortBy.album => l10n.album,
+      SortBy.albumArtist => l10n.albumArtist,
+      SortBy.artist => l10n.performingArtist,
+      SortBy.budget => l10n.budget,
+      SortBy.communityRating => l10n.communityRating,
+      SortBy.criticRating => l10n.criticRating,
+      SortBy.dateCreated => l10n.dateAdded,
+      SortBy.datePlayed => l10n.datePlayed,
+      SortBy.playCount => l10n.playCount,
+      SortBy.premiereDate => l10n.premiereDate,
+      SortBy.productionYear => l10n.productionYear,
+      SortBy.sortName => l10n.name,
+      SortBy.random => l10n.random,
+      SortBy.revenue => l10n.revenue,
+      SortBy.runtime => l10n.duration,
+      SortBy.defaultOrder => l10n.defaultOrder,
+      SortBy.inAlbumOrPlaylist => l10n.inAlbumOrPlaylist,
+    };
+  }
 
   /// Name used by Jellyfin in API requests.
-  String jellyfinName(TabContentType? contentType) {
-    switch (contentType) {
-      case TabContentType.albums:
-        return _jellyfinNameMusicAlbums(this);
-      case TabContentType.tracks:
-        return _jellyfinNameTracks(this);
-      default:
-        return _jellyfinName(this);
-    }
-  }
-
-  String _humanReadableName(SortBy sortBy) {
-    switch (sortBy) {
-      case SortBy.album:
-        return "Album";
-      case SortBy.albumArtist:
-        return "Album Artist";
-      case SortBy.artist:
-        return "Performing Artist";
-      case SortBy.budget:
-        return "Budget";
-      case SortBy.communityRating:
-        return "Community Rating";
-      case SortBy.criticRating:
-        return "Critic Rating";
-      case SortBy.dateCreated:
-        return "Date Added";
-      case SortBy.datePlayed:
-        return "Date Played";
-      case SortBy.playCount:
-        return "Play Count";
-      case SortBy.premiereDate:
-        return "Release Date";
-      case SortBy.productionYear:
-        return "Production Year";
-      case SortBy.sortName:
-        return "Name";
-      case SortBy.random:
-        return "Random";
-      case SortBy.revenue:
-        return "Revenue";
-      case SortBy.runtime:
-        return "Runtime";
-      case SortBy.defaultOrder:
-        return "Server Order";
-    }
-  }
-
-  String _humanReadableLocalisedName(SortBy sortBy, BuildContext context) {
-    switch (sortBy) {
-      case SortBy.album:
-        return AppLocalizations.of(context)!.album;
-      case SortBy.albumArtist:
-        return AppLocalizations.of(context)!.albumArtist;
-      case SortBy.artist:
-        return AppLocalizations.of(context)!.performingArtist;
-      case SortBy.budget:
-        return AppLocalizations.of(context)!.budget;
-      case SortBy.communityRating:
-        return AppLocalizations.of(context)!.communityRating;
-      case SortBy.criticRating:
-        return AppLocalizations.of(context)!.criticRating;
-      case SortBy.dateCreated:
-        return AppLocalizations.of(context)!.dateAdded;
-      case SortBy.datePlayed:
-        return AppLocalizations.of(context)!.datePlayed;
-      case SortBy.playCount:
-        return AppLocalizations.of(context)!.playCount;
-      case SortBy.premiereDate:
-        return AppLocalizations.of(context)!.premiereDate;
-      case SortBy.productionYear:
-        return AppLocalizations.of(context)!.productionYear;
-      case SortBy.sortName:
-        return AppLocalizations.of(context)!.name;
-      case SortBy.random:
-        return AppLocalizations.of(context)!.random;
-      case SortBy.revenue:
-        return AppLocalizations.of(context)!.revenue;
-      case SortBy.runtime:
-        return AppLocalizations.of(context)!.duration;
-      case SortBy.defaultOrder:
-        return AppLocalizations.of(context)!.defaultOrder;
-    }
+  String jellyfinName(ContentType? contentType) {
+    return switch (contentType) {
+      ContentType.albums => _jellyfinNameMusicAlbums(this),
+      ContentType.tracks => _jellyfinNameTracks(this),
+      _ => _jellyfinName(this),
+    };
   }
 
   String _jellyfinName(SortBy sortBy) {
-    switch (sortBy) {
-      case SortBy.album:
-        return "Album";
-      case SortBy.albumArtist:
-        return "AlbumArtist";
-      case SortBy.artist:
-        return "Artist";
-      case SortBy.budget:
-        return "Budget";
-      case SortBy.communityRating:
-        return "CommunityRating";
-      case SortBy.criticRating:
-        return "CriticRating";
-      case SortBy.dateCreated:
-        return "DateCreated";
-      case SortBy.datePlayed:
-        return "DatePlayed";
-      case SortBy.playCount:
-        return "PlayCount";
-      case SortBy.premiereDate:
-        return "PremiereDate";
-      case SortBy.productionYear:
-        return "ProductionYear";
-      case SortBy.sortName:
-        return "SortName";
-      case SortBy.random:
-        return "Random";
-      case SortBy.revenue:
-        return "Revenue";
-      case SortBy.runtime:
-        return "Runtime";
-      case SortBy.defaultOrder:
-        return "";
-    }
+    return switch (sortBy) {
+      SortBy.album => "Album",
+      SortBy.albumArtist => "AlbumArtist",
+      SortBy.artist => "Artist",
+      SortBy.budget => "Budget",
+      SortBy.communityRating => "CommunityRating",
+      SortBy.criticRating => "CriticRating",
+      SortBy.dateCreated => "DateCreated",
+      SortBy.datePlayed => "DatePlayed",
+      SortBy.playCount => "PlayCount",
+      SortBy.premiereDate => "PremiereDate",
+      SortBy.productionYear => "ProductionYear",
+      SortBy.sortName => "SortName",
+      SortBy.random => "Random",
+      SortBy.revenue => "Revenue",
+      SortBy.runtime => "Runtime",
+      SortBy.defaultOrder => "",
+      SortBy.inAlbumOrPlaylist => "ParentIndexNumber,IndexNumber,SortName",
+    };
   }
 
   String _jellyfinNameMusicAlbums(SortBy sortBy) {
-    switch (sortBy) {
-      case SortBy.album:
-        return "Album";
-      case SortBy.albumArtist:
-        return "AlbumArtist,SortName";
-      case SortBy.artist:
-        return "Artist";
-      case SortBy.budget:
-        return "Budget";
-      case SortBy.communityRating:
-        return "CommunityRating,SortName";
-      case SortBy.criticRating:
-        return "CriticRating,SortName";
-      case SortBy.dateCreated:
-        return "DateCreated,SortName";
-      case SortBy.datePlayed:
-        return "DatePlayed";
-      case SortBy.playCount:
-        return "PlayCount";
-      case SortBy.premiereDate:
-        return "PremiereDate";
-      case SortBy.productionYear:
-        return "ProductionYear,PremiereDate,SortName";
-      case SortBy.sortName:
-        return "SortName";
-      case SortBy.random:
-        return "Random,SortName";
-      case SortBy.revenue:
-        return "Revenue";
-      case SortBy.runtime:
-        return "Runtime";
-      case SortBy.defaultOrder:
-        return "";
-    }
+    return switch (sortBy) {
+      SortBy.album => "Album",
+      SortBy.albumArtist => "AlbumArtist,SortName",
+      SortBy.artist => "Artist",
+      SortBy.budget => "Budget",
+      SortBy.communityRating => "CommunityRating,SortName",
+      SortBy.criticRating => "CriticRating,SortName",
+      SortBy.dateCreated => "DateCreated,SortName",
+      SortBy.datePlayed => "DatePlayed",
+      SortBy.playCount => "PlayCount",
+      SortBy.premiereDate => "PremiereDate,SortName",
+      SortBy.productionYear => "ProductionYear,PremiereDate,SortName",
+      SortBy.sortName => "SortName",
+      SortBy.random => "Random,SortName",
+      SortBy.revenue => "Revenue",
+      SortBy.runtime => "Runtime",
+      SortBy.defaultOrder => "",
+      SortBy.inAlbumOrPlaylist => "ParentIndexNumber,IndexNumber,SortName",
+    };
   }
 
   String _jellyfinNameTracks(SortBy sortBy) {
-    switch (sortBy) {
-      case SortBy.album:
-        return "Album,SortName";
-      case SortBy.albumArtist:
-        return "AlbumArtist,Album,SortName";
-      case SortBy.artist:
-        return "Artist,Album,SortName";
-      case SortBy.budget:
-        return "Budget";
-      case SortBy.communityRating:
-        return "CommunityRating";
-      case SortBy.criticRating:
-        return "CriticRating";
-      case SortBy.dateCreated:
-        return "DateCreated,SortName";
-      case SortBy.datePlayed:
-        return "DatePlayed,SortName";
-      case SortBy.playCount:
-        return "PlayCount,SortName";
-      case SortBy.premiereDate:
-        return "PremiereDate,AlbumArtist,Album,SortName";
-      case SortBy.productionYear:
-        return "ProductionYear";
-      case SortBy.sortName:
-        return "Name";
-      case SortBy.random:
-        return "Random";
-      case SortBy.revenue:
-        return "Revenue";
-      case SortBy.runtime:
-        return "Runtime,AlbumArtist,Album,SortName";
-      case SortBy.defaultOrder:
-        return "";
-    }
+    return switch (sortBy) {
+      SortBy.album => "Album,SortName",
+      SortBy.albumArtist => "AlbumArtist,Album,SortName",
+      SortBy.artist => "Artist,Album,SortName",
+      SortBy.budget => "Budget",
+      SortBy.communityRating => "CommunityRating",
+      SortBy.criticRating => "CriticRating",
+      SortBy.dateCreated => "DateCreated,SortName",
+      SortBy.datePlayed => "DatePlayed,SortName",
+      SortBy.playCount => "PlayCount,SortName",
+      SortBy.premiereDate => "PremiereDate,Album,ParentIndexNumber,IndexNumber,SortName",
+      SortBy.productionYear => "ProductionYear",
+      SortBy.sortName => "Name",
+      SortBy.random => "Random",
+      SortBy.revenue => "Revenue",
+      SortBy.runtime => "Runtime,AlbumArtist,Album,SortName",
+      SortBy.defaultOrder => "",
+      SortBy.inAlbumOrPlaylist => "ParentIndexNumber,IndexNumber,SortName",
+    };
   }
 
-  IconData? getIcon() {
-    switch (this) {
-      case SortBy.album:
-        return TablerIcons.disc;
-      case SortBy.albumArtist:
-      case SortBy.artist:
-        return TablerIcons.user;
-      case SortBy.communityRating:
-      case SortBy.criticRating:
-        return TablerIcons.chart_bar_popular;
-      case SortBy.dateCreated:
-        return TablerIcons.calendar_plus;
-      case SortBy.datePlayed:
-        return TablerIcons.clock;
-      case SortBy.playCount:
-        return TablerIcons.sum;
-      case SortBy.premiereDate:
-      case SortBy.productionYear:
-        return TablerIcons.calendar;
-      case SortBy.sortName:
-        return TablerIcons.abc;
-      case SortBy.random:
-        return TablerIcons.arrows_shuffle;
-      case SortBy.revenue:
-        return TablerIcons.coins;
-      case SortBy.runtime:
-        return TablerIcons.stopwatch;
-      case SortBy.defaultOrder:
-        return TablerIcons.server;
-      default:
-        return null;
-    }
+  IconData getIcon() {
+    return switch (this) {
+      SortBy.album => TablerIcons.disc,
+      SortBy.albumArtist || SortBy.artist => TablerIcons.user,
+      SortBy.communityRating || SortBy.criticRating => TablerIcons.chart_bar_popular,
+      SortBy.dateCreated => TablerIcons.calendar_plus,
+      SortBy.datePlayed => TablerIcons.clock,
+      SortBy.playCount => TablerIcons.sum,
+      SortBy.premiereDate || SortBy.productionYear => TablerIcons.calendar,
+      SortBy.sortName => TablerIcons.abc,
+      SortBy.random => TablerIcons.arrows_shuffle,
+      SortBy.revenue => TablerIcons.coins,
+      SortBy.runtime => TablerIcons.stopwatch,
+      SortBy.defaultOrder => TablerIcons.server,
+      SortBy.budget => TablerIcons.moneybag,
+      SortBy.inAlbumOrPlaylist => TablerIcons.disc,
+    };
   }
 }
 
@@ -3512,12 +3487,26 @@ enum SortOrder {
   String toString() => _humanReadableName(this);
 
   String _humanReadableName(SortOrder sortOrder) {
-    switch (sortOrder) {
-      case SortOrder.ascending:
-        return "Ascending";
-      case SortOrder.descending:
-        return "Descending";
-    }
+    return switch (sortOrder) {
+      SortOrder.ascending => "Ascending",
+      SortOrder.descending => "Descending",
+    };
+  }
+
+  String toLocalisedString(BuildContext context) => _humanReadableLocalisedName(this, context);
+
+  String _humanReadableLocalisedName(SortOrder sortOrder, BuildContext context) {
+    return switch (sortOrder) {
+      SortOrder.ascending => AppLocalizations.of(context)!.ascending,
+      SortOrder.descending => AppLocalizations.of(context)!.descending,
+    };
+  }
+
+  IconData getIcon() {
+    return switch (this) {
+      SortOrder.ascending => TablerIcons.sort_ascending_letters,
+      SortOrder.descending => TablerIcons.sort_descending_letters,
+    };
   }
 }
 
@@ -3748,9 +3737,103 @@ class LyricLineCue {
 
   int get startMicros => start ~/ 10;
 
-  int get endMicros => end != null ? end! ~/ 10 : 0;
+  int? get endMicros => end != null ? end! ~/ 10 : null;
 
   factory LyricLineCue.fromJson(Map<String, dynamic> json) => _$LyricLineCueFromJson(json);
 
   Map<String, dynamic> toJson() => _$LyricLineCueToJson(this);
+}
+
+@JsonSerializable(fieldRename: FieldRename.pascal, explicitToJson: true, anyMap: true)
+@HiveType(typeId: 102)
+class PlaybackInfoRequest {
+  PlaybackInfoRequest({
+    this.userId,
+    this.deviceProfile,
+    this.startTimeTicks,
+    this.maxStreamingBitrate,
+    this.audioStreamIndex,
+    this.subtitleStreamIndex,
+    this.maxAudioChannels,
+    this.mediaSourceId,
+    this.liveStreamId,
+    this.enableDirectPlay,
+    this.enableDirectStream,
+    this.enableTranscoding,
+    this.allowVideoStreamCopy,
+    this.allowAudioStreamCopy,
+    this.autoOpenLiveStream,
+    this.alwaysBurnInSubtitleWhenTranscoding,
+  });
+
+  final String? userId;
+  final DeviceProfile? deviceProfile;
+  final int? startTimeTicks;
+  final int? maxStreamingBitrate;
+  final int? audioStreamIndex;
+  final int? subtitleStreamIndex;
+  final int? maxAudioChannels;
+  final String? mediaSourceId;
+  final String? liveStreamId;
+  final bool? enableDirectPlay;
+  final bool? enableDirectStream;
+  final bool? enableTranscoding;
+  final bool? allowVideoStreamCopy;
+  final bool? allowAudioStreamCopy;
+  final bool? autoOpenLiveStream;
+  final bool? alwaysBurnInSubtitleWhenTranscoding;
+
+  factory PlaybackInfoRequest.fromJson(Map<String, dynamic> json) => _$PlaybackInfoRequestFromJson(json);
+
+  Map<String, dynamic> toJson() => _$PlaybackInfoRequestToJson(this);
+}
+
+@JsonSerializable(
+  fieldRename: FieldRename.pascal,
+  explicitToJson: true,
+  anyMap: true,
+  converters: [BaseItemIdConverter()],
+)
+@HiveType(typeId: 104)
+class PlaylistInfo {
+  PlaylistInfo({this.openAccess, this.shares, this.itemIds});
+
+  @HiveField(0)
+  bool? openAccess;
+
+  @HiveField(1)
+  List<PlaylistUser>? shares;
+
+  @HiveField(2)
+  List<BaseItemId>? itemIds;
+
+  factory PlaylistInfo.fromJson(Map<String, dynamic> json) => _$PlaylistInfoFromJson(json);
+  Map<String, dynamic> toJson() => _$PlaylistInfoToJson(this);
+}
+
+@JsonSerializable(fieldRename: FieldRename.pascal, explicitToJson: true, anyMap: true)
+@HiveType(typeId: 105)
+class PlaylistUser {
+  PlaylistUser({this.userId, this.canEdit});
+
+  @HiveField(0)
+  String? userId;
+
+  @HiveField(1)
+  bool? canEdit;
+
+  factory PlaylistUser.fromJson(Map<String, dynamic> json) => _$PlaylistUserFromJson(json);
+  Map<String, dynamic> toJson() => _$PlaylistUserToJson(this);
+}
+
+@JsonSerializable(fieldRename: FieldRename.pascal, explicitToJson: true, anyMap: true)
+@HiveType(typeId: 106)
+class PlaylistUsers {
+  PlaylistUsers({this.users});
+
+  @HiveField(0)
+  List<PlaylistUser>? users;
+
+  factory PlaylistUsers.fromJson(Map<String, dynamic> json) => _$PlaylistUsersFromJson(json);
+  Map<String, dynamic> toJson() => _$PlaylistUsersToJson(this);
 }
