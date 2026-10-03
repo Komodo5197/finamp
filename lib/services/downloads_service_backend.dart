@@ -1428,9 +1428,7 @@ class DownloadsSyncService {
           outputItems =
               await _jellyfinApiData.getItems(
                 parentItem: (baseItemType == BaseItemDtoType.genre) ? collection.library! : item,
-                libraryFilter: (baseItemType == BaseItemDtoType.artist)
-                    ? ResolvedLibraryId(collection.library!.id.raw)
-                    : null,
+                libraryFilter: (baseItemType == BaseItemDtoType.artist) ? LibraryId(collection.library!.id.raw) : null,
                 genreFilter: (baseItemType == BaseItemDtoType.genre) ? item.id : null,
                 includeItemTypes: BaseItemDtoType.album.jellyfinName,
                 fields: fields,
@@ -1444,7 +1442,7 @@ class DownloadsSyncService {
             outputItems.addAll(
               await _jellyfinApiData.getItems(
                     parentItem: item,
-                    libraryFilter: ResolvedLibraryId(collection.library!.id.raw),
+                    libraryFilter: LibraryId(collection.library!.id.raw),
                     includeItemTypes: BaseItemDtoType.track.jellyfinName,
                     filters: "Artist=${parent.name}",
                     artistType: ArtistType.artist,

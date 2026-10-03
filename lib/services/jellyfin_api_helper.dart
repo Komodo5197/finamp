@@ -163,7 +163,7 @@ class JellyfinApiHelper {
 
   Future<List<BaseItemDto>?> getItems({
     BaseItemDto? parentItem,
-    ResolvedLibraryId? libraryFilter,
+    LibraryId? libraryFilter,
     String? includeItemTypes,
     String? sortBy,
     String? sortOrder,
@@ -232,7 +232,7 @@ class JellyfinApiHelper {
 
   Future<QueryResult_BaseItemDto> getItemsWithTotalRecordCount({
     BaseItemDto? parentItem,
-    ResolvedLibraryId? libraryFilter,
+    LibraryId? libraryFilter,
     String? includeItemTypes,
     String? sortBy,
     String? sortOrder,
@@ -271,7 +271,7 @@ class JellyfinApiHelper {
 
   Future<QueryResult_BaseItemDto> _fetchGetItemsResponse({
     BaseItemDto? parentItem,
-    ResolvedLibraryId? libraryFilter,
+    LibraryId? libraryFilter,
     String? includeItemTypes,
     String? sortBy,
     String? sortOrder,

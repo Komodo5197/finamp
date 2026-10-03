@@ -293,8 +293,8 @@ Future<List<BaseItemDto>?> loadHomeSectionItems(
   final artistType = artistFilter != null ? ref.watch(finampSettingsProvider.defaultArtistType) : tabArtistType;
 
   return jellyfinApiHelper.getItems(
-    libraryFilter: library,
-    parentItem: request.tab == ContentType.playlists ? null : artistFilter?.extraBaseItem,
+    libraryFilter: request.tab == ContentType.playlists ? null : library,
+    parentItem: artistFilter?.extraBaseItem,
     includeItemTypes: [request.tab.itemType?.jellyfinName].join(","),
     sortBy: request.sortConfig.sortBy.jellyfinName(request.tab),
     sortOrder: request.sortConfig.sortOrder.toString(),
@@ -342,7 +342,7 @@ Future<List<BaseItemDto>?> loadHomeSectionItemsOffline({
   final genreFilter = request.sortConfig.filters.firstWhereOrNull((x) => x.type == ItemFilterType.genreFilter);
   final artistFilter = request.sortConfig.filters.firstWhereOrNull((x) => x.type == ItemFilterType.artistFilter);
 
-  ResolvedLibraryId? libraryId = request.library.resolve(ref);
+  LibraryId? libraryId = request.library.resolve(ref);
 
   //FIXME this seems to also return metadata-only albums which don't have any downloaded children
   if (request.tab == ContentType.tracks && artistFilter != null) {

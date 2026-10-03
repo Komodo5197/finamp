@@ -62,9 +62,9 @@ class DownloadButton extends ConsumerWidget {
         parentTooltip = AppLocalizations.of(context)!.incidentalDownloadTooltip(parentName);
       }
     }
-    ResolvedLibraryId viewId;
+    LibraryId viewId;
     if (isLibrary) {
-      viewId = ResolvedLibraryId(item.id);
+      viewId = LibraryId(item.id);
     } else {
       final finampUserHelper = GetIt.instance<FinampUserHelper>();
       viewId = finampUserHelper.currentUser!.currentLibraryId!;

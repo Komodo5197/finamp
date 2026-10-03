@@ -53,7 +53,7 @@ class FinampUserHelper {
     return GetIt.instance<FinampUserHelper>().currentUser;
   });
 
-  static ProviderListenable<ResolvedLibraryId?> get currentLibraryProvider =>
+  static ProviderListenable<LibraryId?> get currentLibraryProvider =>
       currentUserProvider.select((x) => x?.currentLibraryId);
 
   Future<void> migrateFromHive() async {
@@ -94,17 +94,17 @@ class FinampUserHelper {
     FinampUser currentUserTemp = currentUser!;
 
     currentUserTemp.views = Map<BaseItemId, BaseItemDto>.fromEntries(newViews.map((e) => MapEntry(e.id, e)));
-    currentUserTemp.currentLibraryId = ResolvedLibraryId(currentUserTemp.views.keys.first.raw);
+    currentUserTemp.currentLibraryId = LibraryId(currentUserTemp.views.keys.first.raw);
 
     _isar.writeTxnSync(() {
       _isar.finampUsers.putSync(currentUserTemp, saveLinks: false);
     });
   }
 
-  void setCurrentUserCurrentViewId(ResolvedLibraryId newViewId) {
+  void setCurrentUserCurrentViewId(LibraryId newViewId) {
     FinampUser currentUserTemp = currentUser!;
 
-    currentUserTemp.currentLibraryId = ResolvedLibraryId(newViewId.raw);
+    currentUserTemp.currentLibraryId = LibraryId(newViewId.raw);
 
     _isar.writeTxnSync(() {
       _isar.finampUsers.putSync(currentUserTemp, saveLinks: false);

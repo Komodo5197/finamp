@@ -56,7 +56,6 @@ class TrackListTile extends ConsumerWidget {
 
     /// The parent item which will be played with starting index [index] on tap.
     required this.parentPlayable,
-    this.selectedFilter,
 
     /// Index of the track in whatever parent this widget is in. Used to start
     /// the audio service at a certain index, such as when selecting the middle
@@ -77,13 +76,11 @@ class TrackListTile extends ConsumerWidget {
 
     this.allowDismiss = true,
     this.highlightCurrentTrack = true,
-    this.genreFilter,
     this.playbackProgress,
   });
 
   final BaseItemDto item;
   final FinampPlayable parentPlayable;
-  final CuratedItemSelectionType? selectedFilter;
   final int? index;
   final bool showIndex;
   final bool showCover;
@@ -93,7 +90,6 @@ class TrackListTile extends ConsumerWidget {
   final SortBy? adaptiveAdditionalInfoSortBy;
   final bool allowDismiss;
   final bool highlightCurrentTrack;
-  final BaseItemDto? genreFilter;
   final double? playbackProgress;
 
   @override
@@ -109,85 +105,13 @@ class TrackListTile extends ConsumerWidget {
       playable = true;
     }
 
-    // TODO fix passing down playable so that genre curated items lazy loading works
-
-    // We lazyload more tracks here if the user starts a queue from one of the top tracks sections
-    // because for performance-reasons, we first only fetch the data for the 5 tracks we really need
-    /*Future<void> lazyAddMoreTracks(PlayableSlice slice) async {
-      if (parentItem == null || selectedFilter == null) return;
-
-      final baseItemType = BaseItemDtoType.fromItem(parentItem!);
-      final SortBy sortBy = selectedFilter!.getSortBy();
-      final queueService = GetIt.instance<QueueService>();
-      final jellyfinApiHelper = GetIt.instance<JellyfinApiHelper>();
-      List<BaseItemDto> allTracks;
-
-      // Load track data
-      if (baseItemType == BaseItemDtoType.artist) {
-        allTracks = await ref.read(
-          getArtistTracksProvider(
-            artist: parentItem!,
-            libraryFilter: library?.id,
-            genreFilter: genreFilter?.id,
-            onlyFavorites: selectedFilter == CuratedItemSelectionType.favorites,
-          ).future,
-        );
-      } else if (baseItemType == BaseItemDtoType.genre) {
-        final bool isOffline = ref.read(finampSettingsProvider.isOffline);
-
-        if (isOffline) {
-          final downloadsService = GetIt.instance<DownloadsService>();
-          final List<DownloadStub> fetchedItems = await downloadsService.getAllTracks(
-            viewFilter: library?.id,
-            nullableViewFilters: ref.read(finampSettingsProvider.showDownloadsWithUnknownLibrary),
-            onlyFavorites: (selectedFilter == CuratedItemSelectionType.favorites)
-                ? ref.read(finampSettingsProvider.trackOfflineFavorites)
-                : false,
-            genreFilter: parentItem?.id,
-          );
-          allTracks = fetchedItems.map((e) => e.baseItem).nonNulls.toList();
-        } else {
-          allTracks =
-              await jellyfinApiHelper.getItems(
-                parentItem: library,
-                genreFilter: parentItem?.id,
-                sortBy: sortBy.jellyfinName(ContentType.tracks),
-                sortOrder: "Descending",
-                isFavorite: (selectedFilter == CuratedItemSelectionType.favorites) ? true : null,
-                limit: FinampSettingsHelper.finampSettings.trackShuffleItemCount,
-                includeItemTypes: BaseItemDtoType.track.jellyfinName,
-              ) ??
-              [];
-        }
-      } else {
-        return;
-      }
-
-      // Build a fast lookup set of already-present track IDs
-      final resolved = await slice.resolve();
-      final Set<String> childIds = resolved.items.map((track) => track.id.raw).where((id) => id.isNotEmpty).toSet();
-
-      // Filter out tracks that are already in "children" and then sort according to the selected filter
-      List<BaseItemDto> remainingTracks = allTracks.where((track) => !childIds.contains(track.id.raw)).toList();
-      remainingTracks = sortItems(remainingTracks, sortBy, SortOrder.descending);
-
-      // Append to queue
-      await queueService.addToQueue(
-        PlayableSlice.simple(
-          remainingTracks,
-          QueueItemSource.rawId(
-            type: QueueItemSourceType.album,
-            name: QueueItemSourceName(
-              type: QueueItemSourceNameType.preTranslated,
-              pretranslatedName: parentItem?.name ?? item.album ?? AppLocalizations.of(context)!.placeholderSource,
-            ),
-            id: parentItem?.id.raw ?? "",
-            item: parentItem,
-            contextNormalizationGain: null,
-          ),
-        ),
-      );
-    }*/
+    final parentItem =
+        this.parentItem ??
+        switch (parentPlayable) {
+          FinampPlayableDto item => item.item,
+          PrecalculatedPlayable list => list.source.item,
+          _ => null,
+        };
 
     Future<void> trackListTileOnTap(bool playable) async {
       final queueService = GetIt.instance<QueueService>();
@@ -249,7 +173,7 @@ class TrackListTile extends ConsumerWidget {
             : FinampSettingsHelper.finampSettings.itemSwipeActionRightToLeft;
         return await onConfirmPlayableDismiss(
           followUpAction: followUpAction,
-          item: Track(item, source: QueueItemSource.fromBaseItem(parentItem ?? item)),
+          item: Track(item, source: parentPlayable.source),
         );
       },
       leftSwipeBackground: buildSwipeActionBackground(
@@ -363,9 +287,7 @@ DismissDirection getAllowedDismissDirection({required bool swipeLeftEnabled, req
 }
 
 class QueueListTile extends StatelessWidget {
-  final BaseItemDto item;
   final FinampQueueItem queueItem;
-  final BaseItemDto? parentItem;
   final int? listIndex;
   final bool isInPlaylist;
   final bool allowReorder;
@@ -378,25 +300,23 @@ class QueueListTile extends StatelessWidget {
 
   const QueueListTile({
     super.key,
-    required this.item,
     required this.queueItem,
     required this.listIndex,
     required this.onTap,
     required this.isInPlaylist,
     required this.allowReorder,
     this.highlightCurrentTrack = false,
-    this.parentItem,
     this.onRemoveFromList,
   });
 
   @override
   Widget build(BuildContext context) {
     return TrackListItem(
-      baseItem: item,
+      baseItem: queueItem.baseItem,
       queueItem: queueItem,
-      parentItem: parentItem,
+      parentItem: queueItem.source.item,
       listIndex: listIndex,
-      actualIndex: item.indexNumber,
+      actualIndex: queueItem.baseItem.indexNumber,
       highlightCurrentTrack: highlightCurrentTrack,
       onRemoveFromList: onRemoveFromList,
       // This must be in ListTile instead of parent GestureDetector to

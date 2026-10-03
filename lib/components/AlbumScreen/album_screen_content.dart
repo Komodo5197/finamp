@@ -236,8 +236,8 @@ class TracksSliverList extends ConsumerStatefulWidget {
     super.key,
     required this.childrenForList,
     required this.childrenForQueue,
-    this.selectedFilter,
     required this.parent,
+    this.generateFollowupTracks,
     this.onRemoveFromList,
     this.forceAlbumArtists = false,
     this.adaptiveAdditionalInfoSortBy,
@@ -245,9 +245,8 @@ class TracksSliverList extends ConsumerStatefulWidget {
 
   final List<BaseItemDto> childrenForList;
   final List<BaseItemDto> childrenForQueue;
-  final CuratedItemSelectionType? selectedFilter;
-  // TODO switch this to a playable
   final BaseItemDto parent;
+  final Future<List<BaseItemDto>> Function()? generateFollowupTracks;
   final BaseItemDtoCallback? onRemoveFromList;
   final bool forceAlbumArtists;
   final SortBy? adaptiveAdditionalInfoSortBy;
@@ -313,11 +312,9 @@ class _TracksSliverListState extends ConsumerState<TracksSliverList> {
         return TrackListTile(
           key: ValueKey(item.id),
           item: item,
-          selectedFilter: widget.selectedFilter,
           index: indexOffset,
           showIndex: item.albumId == widget.parent.id,
           showCover: item.albumId != widget.parent.id || ref.watch(finampSettingsProvider.showCoversOnAlbumScreen),
-          parentItem: widget.parent,
           onRemoveFromList: () {
             final item = removeItem();
             if (widget.onRemoveFromList != null) {
@@ -326,10 +323,10 @@ class _TracksSliverListState extends ConsumerState<TracksSliverList> {
           },
           forceAlbumArtists: widget.forceAlbumArtists,
           adaptiveAdditionalInfoSortBy: widget.adaptiveAdditionalInfoSortBy,
-          // TODO should we be passing and leveraging a proper parent playable?
           parentPlayable: PrecalculatedPlayable(
             source: QueueItemSource.fromBaseItem(widget.parent),
             tracks: widget.childrenForQueue,
+            generateFollowupTracks: widget.generateFollowupTracks,
           ),
         );
       }, childCount: widget.childrenForList.length),

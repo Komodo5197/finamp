@@ -335,6 +335,7 @@ class _MusicScreenState extends ConsumerState<MusicScreen> with TickerProviderSt
                       child: Material(
                         child: MusicScreenTabView(
                           refresh: refreshMap[tabType],
+                          resetSearchQuery: _stopSearching,
                           allowTrackGestures: widget.singleTabConfig != null,
                           displayable: displayable,
                         ),

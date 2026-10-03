@@ -59,7 +59,7 @@ class AudioServiceHelper {
 
   Future<(List<BaseItemDto>, int)?> getShuffleAllTracks({
     required bool onlyShowFavorites,
-    required ResolvedLibraryId? library,
+    required LibraryId? library,
     BaseItemDto? genreFilter,
     int? itemCount,
   }) async {

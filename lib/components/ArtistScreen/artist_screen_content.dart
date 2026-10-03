@@ -26,7 +26,7 @@ class ArtistScreenContent extends ConsumerStatefulWidget {
   const ArtistScreenContent({super.key, required this.parent, required this.library, this.genreFilter});
 
   final BaseItemDto parent;
-  final ResolvedLibraryId library;
+  final LibraryId library;
   final BaseItemDto? genreFilter;
 
   @override
@@ -311,16 +311,15 @@ class _ArtistScreenContentState extends ConsumerState<ArtistScreenContent> {
                   if (ref.watch(finampSettingsProvider.showArtistsTracksSection)) {
                     return SliverPadding(
                       padding: const EdgeInsets.all(0),
-                      sliver: TracksSection(
+                      sliver: CuratedTracksSection(
                         parent: widget.parent,
                         tracks: topTracks,
-                        childrenForQueue: topTracks,
                         tracksText: type.toLocalisedSectionTitle(context, artistCuratedItemSelectionType),
                         isOnArtistScreen: true,
                         genreFilter: sortConfig.genreFilter,
                         includeFilterRow: true,
                         customFilterOrder: artistCuratedItemSectionFilterOrder,
-                        selectedFilter: artistCuratedItemSelectionType,
+                        selectedFilter: artistCuratedItemSelectionType!,
                         disabledFilters: _disabledTrackFilters.toList(),
                         onFilterSelected: (type) {
                           // We store the clicked type locally in addition to changing the setting,

@@ -29,7 +29,7 @@ class GenreScreenContent extends ConsumerStatefulWidget {
   const GenreScreenContent({super.key, required this.parent, required this.library});
 
   final BaseItemDto parent;
-  final ResolvedLibraryId library;
+  final LibraryId library;
 
   @override
   ConsumerState<GenreScreenContent> createState() => _GenreScreenContentState();
@@ -295,10 +295,9 @@ class _GenreScreenContentState extends ConsumerState<GenreScreenContent> {
               case GenreItemSections.tracks:
                 return SliverPadding(
                   padding: const EdgeInsets.only(bottom: 12.0),
-                  sliver: TracksSection(
+                  sliver: CuratedTracksSection(
                     parent: widget.parent,
                     tracks: tracks,
-                    childrenForQueue: tracks,
                     tracksText: (genreCuratedItemSelectionTypeTracks != null)
                         ? genreCuratedItemSelectionTypeTracks.toLocalisedSectionTitle(context, BaseItemDtoType.track)
                         : loc.tracks,
@@ -307,7 +306,7 @@ class _GenreScreenContentState extends ConsumerState<GenreScreenContent> {
                         openSeeAll(ContentType.tracks, itemSelectionType: genreCuratedItemSelectionTypeTracks),
                     includeFilterRow: true,
                     customFilterOrder: genreCuratedItemSectionFilterOrder,
-                    selectedFilter: genreCuratedItemSelectionTypeTracks,
+                    selectedFilter: genreCuratedItemSelectionTypeTracks!,
                     disabledFilters: _disabledTrackFilters.toList(),
                     onFilterSelected: (type) {
                       // We store the clicked type locally in addition to changing the setting,

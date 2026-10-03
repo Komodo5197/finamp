@@ -31,7 +31,7 @@ class FinampUserAdapter extends TypeAdapter<FinampUser> {
       isLocal: fields[8] == null ? false : fields[8] as bool,
       accessToken: fields[2] as String,
       serverId: fields[3] as String,
-      currentLibraryId: fields[4] as ResolvedLibraryId?,
+      currentLibraryId: fields[4] as LibraryId?,
       views: fields[5] == null
           ? const {}
           : (fields[5] as Map).cast<BaseItemId, BaseItemDto>(),
@@ -1063,7 +1063,7 @@ class QueueItemSourceAdapter extends TypeAdapter<QueueItemSource> {
       name: fields[1] as QueueItemSourceName,
       id: fields[2] as BaseItemId,
       contextNormalizationGain: (fields[4] as num?)?.toDouble(),
-      library: fields[5] as ResolvedLibraryId?,
+      library: fields[5] as LibraryId?,
     );
   }
 
@@ -1552,7 +1552,7 @@ class TabsHomeSectionAdapter extends TypeAdapter<TabsHomeSection> {
       for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
     };
     return TabsHomeSection(
-      libraryId: fields[1] as LibraryId,
+      libraryId: fields[1] as DynamicLibraryId,
       contentType: fields[0] as ContentType,
     );
   }
@@ -1590,7 +1590,7 @@ class CollectionHomeSectionAdapter extends TypeAdapter<CollectionHomeSection> {
     };
     return CollectionHomeSection(
       itemId: fields[0] as BaseItemId,
-      libraryId: fields[1] as LibraryId,
+      libraryId: fields[1] as DynamicLibraryId,
       contentType: fields[2] as ContentType,
     );
   }
@@ -9464,12 +9464,22 @@ const _$BaseItemDtoTypeEnumMap = {
   BaseItemDtoType.unknown: 'unknown',
 };
 
-FinampCollection _$FinampCollectionFromJson(Map json) => FinampCollection(
+FinampCollection _$FinampCollectionFromJson(Map json) => FinampCollection._(
+  library: json['Library'] == null
+      ? null
+      : BaseItemDto.fromJson(Map<String, dynamic>.from(json['Library'] as Map)),
+  item: json['Item'] == null
+      ? null
+      : BaseItemDto.fromJson(Map<String, dynamic>.from(json['Item'] as Map)),
   type: $enumDecode(_$FinampCollectionTypeEnumMap, json['Type']),
 );
 
 Map<String, dynamic> _$FinampCollectionToJson(FinampCollection instance) =>
-    <String, dynamic>{'Type': _$FinampCollectionTypeEnumMap[instance.type]!};
+    <String, dynamic>{
+      'Type': _$FinampCollectionTypeEnumMap[instance.type]!,
+      if (instance.library?.toJson() case final value?) 'Library': value,
+      if (instance.item?.toJson() case final value?) 'Item': value,
+    };
 
 const _$FinampCollectionTypeEnumMap = {
   FinampCollectionType.favorites: 'favorites',

@@ -19,7 +19,7 @@ part 'artist_content_provider.g.dart';
 Future<(List<BaseItemDto>, CuratedItemSelectionType, Set<CuratedItemSelectionType>?)> getArtistTracksSection(
   Ref ref, {
   required BaseItemDto artist,
-  LibraryId? libraryFilter,
+  DynamicLibraryId? libraryFilter,
   BaseItemId? genreFilter,
 }) async {
   final jellyfinApiHelper = GetIt.instance<JellyfinApiHelper>();
@@ -149,7 +149,7 @@ Future<(List<BaseItemDto>, CuratedItemSelectionType, Set<CuratedItemSelectionTyp
 Future<List<BaseItemDto>> getArtistAlbums(
   Ref ref, {
   required BaseItemDto artist,
-  LibraryId? libraryFilter,
+  DynamicLibraryId? libraryFilter,
   BaseItemId? genreFilter,
   SortBy sortBy = SortBy.premiereDate,
   SortOrder sortOrder = SortOrder.ascending,
@@ -195,7 +195,7 @@ Future<List<BaseItemDto>> getArtistAlbums(
 Future<List<BaseItemDto>> getPerformingArtistAlbums(
   Ref ref, {
   required BaseItemDto artist,
-  LibraryId? libraryFilter,
+  DynamicLibraryId? libraryFilter,
   BaseItemId? genreFilter,
   SortBy sortBy = SortBy.premiereDate,
   SortOrder sortOrder = SortOrder.ascending,
@@ -241,7 +241,7 @@ Future<List<BaseItemDto>> getPerformingArtistAlbums(
 Future<List<BaseItemDto>> getPerformingArtistTracks(
   Ref ref, {
   required BaseItemDto artist,
-  LibraryId? libraryFilter,
+  DynamicLibraryId? libraryFilter,
   BaseItemId? genreFilter,
   bool onlyFavorites = false,
 }) async {
@@ -292,7 +292,7 @@ Future<List<BaseItemDto>> getPerformingArtistTracks(
 Future<List<BaseItemDto>> getArtistTracks(
   Ref ref, {
   required BaseItemDto artist,
-  LibraryId? libraryFilter,
+  DynamicLibraryId? libraryFilter,
   BaseItemId? genreFilter,
   bool onlyFavorites = false,
   SortAndFilterConfiguration? sortAndFilterConfiguration,

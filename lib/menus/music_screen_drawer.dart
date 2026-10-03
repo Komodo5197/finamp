@@ -43,7 +43,7 @@ class MusicScreenDrawer extends ConsumerWidget {
         final excessWidth = constraints.maxWidth - minWidth;
         final expandedWidth = minWidth + excessWidth * 0.5;
         final targetWidth = min(expandedWidth, 450.0);
-        final views = finampUserHelper.currentUser!.views.values.map((x) => ResolvedLibraryId(x.id.raw)).toList();
+        final views = finampUserHelper.currentUser!.views.values.map((x) => LibraryId(x.id.raw)).toList();
         if (views.length > 1) {
           views.add(allLibraryPlaceholder);
         }

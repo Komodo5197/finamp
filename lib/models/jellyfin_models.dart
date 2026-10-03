@@ -32,14 +32,14 @@ class BaseItemIdConverter extends JsonConverter<BaseItemId, String> {
   String toJson(BaseItemId object) => object.raw;
 }
 
-class LibraryIdConverter extends JsonConverter<LibraryId, String> {
+class LibraryIdConverter extends JsonConverter<DynamicLibraryId, String> {
   const LibraryIdConverter();
 
   @override
-  LibraryId fromJson(String json) => LibraryId(json);
+  DynamicLibraryId fromJson(String json) => DynamicLibraryId(json);
 
   @override
-  String toJson(LibraryId object) => object.raw;
+  String toJson(DynamicLibraryId object) => object.raw;
 }
 
 extension type BaseItemId._(String raw) {
@@ -48,36 +48,34 @@ extension type BaseItemId._(String raw) {
   const BaseItemId(this.raw);
 }
 
-extension type LibraryId._(String raw) {
-  /// Construct a BaseItemDto id from a raw string.  Please be sure you have a valid ID before using, and
-  /// if you might not, consider the invalid ID's scope and if you can use an alternative, such as null
-  const LibraryId(this.raw);
+/// A dynamic library id.  In addition to the LibraryId values, this can also be currentLibraryPlaceholder.
+/// As the current library can change at any time, this type must be resolved before use.
+extension type DynamicLibraryId._(String raw) {
+  const DynamicLibraryId(this.raw);
 
-  ResolvedLibraryId? resolve(Ref ref) => switch (this) {
+  LibraryId? resolve(Ref ref) => switch (this) {
     currentLibraryPlaceholder => ref.watch(FinampUserHelper.currentUserProvider)?.currentLibraryId,
     allLibraryPlaceholder => allLibraryPlaceholder,
-    _ => this as ResolvedLibraryId,
+    _ => this as LibraryId,
   };
 
-  ResolvedLibraryId? resolve2(WidgetRef ref) => switch (this) {
+  LibraryId? resolve2(WidgetRef ref) => switch (this) {
     currentLibraryPlaceholder => ref.watch(FinampUserHelper.currentUserProvider)?.currentLibraryId,
     allLibraryPlaceholder => allLibraryPlaceholder,
-    _ => this as ResolvedLibraryId,
+    _ => this as LibraryId,
   };
 
-  ResolvedLibraryId? resolve3() => switch (this) {
+  LibraryId? resolve3() => switch (this) {
     currentLibraryPlaceholder => GetIt.instance<FinampUserHelper>().currentUser?.currentLibraryId,
     allLibraryPlaceholder => allLibraryPlaceholder,
-    _ => this as ResolvedLibraryId,
+    _ => this as LibraryId,
   };
 }
 
-extension type ResolvedLibraryId._(String raw) implements LibraryId {
-  /// A library id which is either a baseItemId or the allLibraryPlaceholder,
-  /// never the currentLibraryPlaceholder.
-  ResolvedLibraryId(this.raw) : assert(raw != currentLibraryPlaceholder.raw);
-
-  const ResolvedLibraryId.__(this.raw);
+/// A fixed library id.  This can either be a BaseItemId from an item of type library, or it can
+/// be the allLibraryPlaceholder.
+extension type const LibraryId._(String raw) implements DynamicLibraryId {
+  LibraryId(this.raw) : assert(raw != currentLibraryPlaceholder.raw);
 
   BaseItemId? get viewId => switch (this) {
     allLibraryPlaceholder => null,
@@ -86,8 +84,8 @@ extension type ResolvedLibraryId._(String raw) implements LibraryId {
 }
 
 // These get saved into home screen configuration and cannot be modified.
-const ResolvedLibraryId allLibraryPlaceholder = ResolvedLibraryId.__("finamp-all-libraries-placeholder");
-const LibraryId currentLibraryPlaceholder = LibraryId("finamp-current-library-placeholder");
+const LibraryId allLibraryPlaceholder = LibraryId._("finamp-all-libraries-placeholder");
+const DynamicLibraryId currentLibraryPlaceholder = DynamicLibraryId("finamp-current-library-placeholder");
 
 /// An abstract class to implement converting runTimeTicks into a duration.
 /// Ideally, we'd hold runTimeTicks here, but that would break offline storage

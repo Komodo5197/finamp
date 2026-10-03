@@ -24,7 +24,7 @@ class DownloadDialog extends ConsumerStatefulWidget {
   });
 
   final DownloadStub item;
-  final ResolvedLibraryId library;
+  final LibraryId library;
   final String? downloadLocationId;
   final bool needsTranscode;
   final List<BaseItemDto>? children;
@@ -37,12 +37,7 @@ class DownloadDialog extends ConsumerStatefulWidget {
   /// if there is more than one location.  A transcode setting dropdown will be shown
   /// if transcode downloads is set to ask.  If neither is needed, the
   /// download is initiated immediately with no dialog.
-  static Future<void> show(
-    BuildContext context,
-    DownloadStub item,
-    ResolvedLibraryId library, {
-    int? trackCount,
-  }) async {
+  static Future<void> show(BuildContext context, DownloadStub item, LibraryId library, {int? trackCount}) async {
     bool needTranscode =
         FinampSettingsHelper.finampSettings.shouldTranscodeDownloads == TranscodeDownloadsSetting.ask &&
         (item.finampCollection?.type.hasAudio ?? true);

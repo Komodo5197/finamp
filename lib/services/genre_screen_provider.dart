@@ -19,7 +19,7 @@ Future<(List<BaseItemDto>, int, CuratedItemSelectionType, Set<CuratedItemSelecti
   Ref ref,
   BaseItemDto parent,
   BaseItemDtoType baseItemType,
-  ResolvedLibraryId? library,
+  LibraryId? library,
 ) async {
   final bool isOffline = ref.watch(finampSettingsProvider.isOffline);
   final bool autoSwitchItemCurationTypeEnabled = ref.watch(finampSettingsProvider.autoSwitchItemCurationType);
@@ -107,7 +107,7 @@ Future<(List<BaseItemDto>, int)> getCuratedItemsOnline({
   required BaseItemDto parent,
   required CuratedItemSelectionType genreCuratedItemSelectionType,
   required BaseItemDtoType baseItemType,
-  ResolvedLibraryId? library,
+  LibraryId? library,
   String? sortBySecondary,
   ArtistType? artistType,
 }) async {
@@ -153,7 +153,7 @@ Future<(List<BaseItemDto>, int)> getCuratedItemsOffline({
   required BaseItemDto parent,
   required CuratedItemSelectionType genreCuratedItemSelectionType,
   required BaseItemDtoType baseItemType,
-  ResolvedLibraryId? library,
+  LibraryId? library,
   BaseItemDtoType? artistInfoForType,
 }) async {
   // The "Most Played" functionality is still here, just in case we find a solution on

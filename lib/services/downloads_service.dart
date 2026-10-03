@@ -1475,7 +1475,7 @@ class DownloadsService {
           .where(
             (collection) =>
                 collection.finampCollection!.type == FinampCollectionType.collectionWithLibraryFilter &&
-                collection.finampCollection!.library?.id == libraryId,
+                collection.finampCollection!.library?.id.raw == libraryId?.raw,
           )
           .map(
             (collection) =>

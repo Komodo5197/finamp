@@ -68,10 +68,10 @@ class FinampUser {
   String serverId;
   @HiveField(4)
   @ignore
-  ResolvedLibraryId? currentLibraryId;
+  LibraryId? currentLibraryId;
   @Name("currentViewId")
   String? get isarCurrentViewId => currentLibraryId?.raw;
-  set isarCurrentViewId(String? id) => currentLibraryId = id == null ? null : ResolvedLibraryId(id);
+  set isarCurrentViewId(String? id) => currentLibraryId = id == null ? null : LibraryId(id);
   @ignore
   @HiveField(5)
   Map<BaseItemId, BaseItemDto> views;
@@ -1485,7 +1485,7 @@ class DownloadStub {
     );
   }
 
-  factory DownloadStub.libraryFilteredItem({required BaseItemDto item, required ResolvedLibraryId? library}) {
+  factory DownloadStub.libraryFilteredItem({required BaseItemDto item, required LibraryId? library}) {
     assert(
       BaseItemDtoType.fromItem(item) == BaseItemDtoType.genre ||
           BaseItemDtoType.fromItem(item) == BaseItemDtoType.artist,
@@ -2183,7 +2183,7 @@ class QueueItemSource {
     BaseItemDto baseItem, {
     QueueItemSourceType? type,
     QueueItemSourceNameType? nameType,
-    ResolvedLibraryId? library,
+    LibraryId? library,
   }) {
     final defaultType = switch (BaseItemDtoType.fromItem(baseItem)) {
       BaseItemDtoType.album => QueueItemSourceType.album,
@@ -2260,7 +2260,7 @@ class QueueItemSource {
   final double? contextNormalizationGain;
 
   @HiveField(5)
-  final ResolvedLibraryId? library;
+  final LibraryId? library;
 
   bool get wantsItem => item == null && RegExp(r'^[0-9a-f]{32}$').matchAsPrefix(id) != null;
 
@@ -2438,7 +2438,7 @@ class FinampQueueOrder {
 
   late String id;
 
-  ResolvedLibraryId? sourceLibrary;
+  LibraryId? sourceLibrary;
 }
 
 //@HiveType(typeId: 59)
@@ -2468,7 +2468,7 @@ class FinampQueueInfo {
 
   String id;
 
-  ResolvedLibraryId? sourceLibrary;
+  LibraryId? sourceLibrary;
 
   int get currentTrackIndex => previousTracks.length + (currentTrack == null ? 0 : 1);
   int get upcomingTrackCount => nextUp.length + queue.length;
@@ -2803,8 +2803,16 @@ enum FinampCollectionType {
   final bool hasAudio;
 }
 
-@JsonSerializable(fieldRename: FieldRename.pascal, explicitToJson: true, anyMap: true, includeIfNull: false)
+@JsonSerializable(
+  fieldRename: FieldRename.pascal,
+  explicitToJson: true,
+  anyMap: true,
+  includeIfNull: false,
+  constructor: "_",
+)
 class FinampCollection {
+  FinampCollection._({required this.library, required this.item, required this.type});
+
   FinampCollection({required this.type}) : library = null, item = null;
 
   FinampCollection.libraryFiltered2({required BaseItemDto this.library, required BaseItemDto this.item})
@@ -4129,7 +4137,7 @@ class TabsHomeSection extends HomeScreenSectionBase {
   @HiveField(0)
   final ContentType contentType;
   @HiveField(1)
-  final LibraryId libraryId;
+  final DynamicLibraryId libraryId;
 
   @override
   bool operator ==(Object other) {
@@ -4150,7 +4158,7 @@ class CollectionHomeSection extends HomeScreenSectionBase {
   @HiveField(0)
   final BaseItemId itemId;
   @HiveField(1)
-  final LibraryId libraryId;
+  final DynamicLibraryId libraryId;
   @HiveField(2)
   final ContentType contentType;
 

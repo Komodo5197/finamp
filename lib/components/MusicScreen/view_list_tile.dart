@@ -15,7 +15,7 @@ import '../../services/finamp_user_helper.dart';
 class ViewListTile extends ConsumerWidget {
   const ViewListTile({super.key, required this.view});
 
-  final ResolvedLibraryId view;
+  final LibraryId view;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
