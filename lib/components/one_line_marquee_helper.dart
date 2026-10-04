@@ -1,4 +1,3 @@
-import 'package:balanced_text/balanced_text.dart';
 import 'package:finamp/services/finamp_settings_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -25,6 +24,7 @@ class OneLineMarqueeHelper extends ConsumerWidget {
         )..layout(maxWidth: constraints.maxWidth);
 
         final isOverflowing = textPainter.didExceedMaxLines;
+        textPainter.dispose();
 
         if (isOverflowing) {
           return Container(
@@ -55,16 +55,7 @@ class OneLineMarqueeHelper extends ConsumerWidget {
             ),
           );
         } else {
-          return SizedBox(
-            width: constraints.maxWidth,
-            child: BalancedText(
-              text,
-              style: style,
-              overflow: TextOverflow.ellipsis,
-              maxLines: 2,
-              textAlign: TextAlign.start,
-            ),
-          );
+          return Text(text, style: style, overflow: TextOverflow.ellipsis, maxLines: 1);
         }
       },
     );

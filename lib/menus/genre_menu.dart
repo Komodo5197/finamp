@@ -4,14 +4,18 @@ import 'package:finamp/components/themed_bottom_sheet.dart';
 import 'package:finamp/menus/components/menuEntries/adaptive_download_lock_delete_menu_entry.dart';
 import 'package:finamp/menus/components/menuEntries/add_to_playlist_menu_entry.dart';
 import 'package:finamp/menus/components/menuEntries/instant_mix_menu_entry.dart';
+import 'package:finamp/menus/components/menuEntries/menu_entry.dart';
+import 'package:finamp/menus/components/menuEntries/mix_builder_menu_entry.dart';
 import 'package:finamp/menus/components/menuEntries/restore_queue_menu_entry.dart';
+import 'package:finamp/menus/components/menuEntries/start_radio_menu_entry.dart';
 import 'package:finamp/menus/components/menuEntries/toggle_favorite_menu_entry.dart';
 import 'package:finamp/menus/components/menu_item_info_header.dart';
+import 'package:finamp/menus/components/playbackActions/playback_action_row.dart';
 import 'package:finamp/models/finamp_models.dart';
 import 'package:finamp/models/jellyfin_models.dart';
 import 'package:flutter/material.dart';
 
-import 'components/menuEntries/menu_entry.dart';
+import '../models/music_models.dart';
 
 const Duration genreMenuDefaultAnimationDuration = Duration(milliseconds: 750);
 const Curve genreMenuDefaultInCurve = Curves.easeOutCubic;
@@ -20,45 +24,33 @@ const genreMenuRouteName = "/genre-menu";
 
 Future<void> showModalGenreMenu({
   required BuildContext context,
-  required BaseItemDto baseItem,
+  required BaseItemDto item,
   FinampStorableQueueInfo? queueInfo,
 }) async {
+  final playableItem = Genre.fromItem(item);
   // Normal menu entries, excluding headers
   List<HideableMenuEntry> getMenuEntries(BuildContext context) {
     return [
       if (queueInfo != null) RestoreQueueMenuEntry(queueInfo: queueInfo),
-      AddToPlaylistMenuEntry(baseItem: baseItem),
-      InstantMixMenuEntry(baseItem: baseItem),
-      AdaptiveDownloadLockDeleteMenuEntry(baseItem: baseItem),
-      ToggleFavoriteMenuEntry(baseItem: baseItem),
+      AddToPlaylistMenuEntry(item: playableItem),
+      InstantMixMenuEntry(baseItem: item),
+      MixBuilderMenuEntry(baseItem: item),
+      StartRadioMenuEntry(baseItem: item),
+      AdaptiveDownloadLockDeleteMenuEntry(baseItem: item),
+      ToggleFavoriteMenuEntry(baseItem: item),
     ];
   }
 
   (double, List<Widget>) getMenuProperties(BuildContext context) {
     final menuEntries = getMenuEntries(context);
-    final stackHeight = ThemedBottomSheet.calculateStackHeight(
-      context: context,
-      menuEntries: menuEntries,
-      includePlaybackrow: false,
-    );
-
-    final pageViewController = PageController();
+    final stackHeight = ThemedBottomSheet.calculateStackHeight(context: context, menuEntries: menuEntries);
 
     List<Widget> menu = [
-      SliverPersistentHeader(delegate: MenuItemInfoSliverHeader(item: baseItem), pinned: true),
-      //!!! temporarily disabled due to performance issues with large queues
-      // MenuMask(
-      //   height: MenuMask.defaultHeight,
-      //   child: SliverToBoxAdapter(
-      //     child: PlaybackActionRow(
-      //       controller: pageViewController,
-      //       playbackActionPages: getPlaybackActionPages(
-      //         context: context,
-      //         baseItem: baseItem,
-      //       ),
-      //     ),
-      //   ),
-      // ),
+      SliverPersistentHeader(delegate: MenuItemInfoSliverHeader(item: playableItem), pinned: true),
+      MenuMask(
+        height: MenuItemInfoSliverHeader.defaultHeight,
+        child: SliverToBoxAdapter(child: PlaybackActionRow(item: playableItem)),
+      ),
       MenuMask(
         height: MenuItemInfoSliverHeader.defaultHeight,
         child: SliverPadding(
@@ -73,7 +65,7 @@ Future<void> showModalGenreMenu({
 
   await showThemedBottomSheet(
     context: context,
-    item: baseItem,
+    item: item,
     routeName: genreMenuRouteName,
     buildSlivers: (context) => getMenuProperties(context),
   );

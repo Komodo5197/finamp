@@ -2,43 +2,41 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:finamp/color_schemes.g.dart';
+import 'package:finamp/components/Buttons/cta_medium.dart';
+import 'package:finamp/components/Shortcuts/global_shortcut_manager.dart';
+import 'package:finamp/components/Shortcuts/music_control_shortcuts.dart';
 import 'package:finamp/components/global_snackbar.dart';
 import 'package:finamp/components/themed_bottom_sheet.dart';
 import 'package:finamp/components/toggleable_list_tile.dart';
-import 'package:finamp/menus/playlist_actions_menu.dart';
-import 'package:finamp/components/Buttons/cta_medium.dart';
+import 'package:finamp/l10n/app_localizations.dart';
 import 'package:finamp/models/finamp_models.dart';
 import 'package:finamp/services/feedback_helper.dart';
 import 'package:finamp/services/finamp_settings_helper.dart';
 import 'package:finamp/services/music_player_background_task.dart';
+import 'package:finamp/services/output_route_provider.dart';
 import 'package:finamp/services/queue_service.dart';
 import 'package:finamp/services/theme_provider.dart';
+import 'package:finamp/utils/platform_helper.dart';
 import 'package:flutter/material.dart';
-import 'package:finamp/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_sticky_header/flutter_sticky_header.dart';
 import 'package:flutter_tabler_icons/flutter_tabler_icons.dart';
 import 'package:flutter_to_airplay/flutter_to_airplay.dart';
 import 'package:get_it/get_it.dart';
-import 'package:logging/logging.dart';
 
 const outputMenuRouteName = "/output-menu";
 
 Future<void> showOutputMenu({required BuildContext context, bool usePlayerTheme = true}) async {
-  final outputPanelLogger = Logger("OutputPanel");
-
   final queueService = GetIt.instance<QueueService>();
 
   FeedbackHelper.feedback(FeedbackType.selection);
 
   await showThemedBottomSheet(
     context: context,
-    item: (queueService.getCurrentTrack()?.baseItem)!, //TODO fix this
+    item: queueService.getCurrentTrack()?.baseItem,
     routeName: outputMenuRouteName,
     minDraggableHeight: 0.2,
     buildSlivers: (context) {
-      var themeColor = Theme.of(context).colorScheme.primary;
-
       final menuEntries = [
         // SongInfo.condensed(
         //   item: item,
@@ -46,15 +44,53 @@ Future<void> showOutputMenu({required BuildContext context, bool usePlayerTheme 
         // ),
         Consumer(
           builder: (context, ref, child) {
-            return VolumeSlider(
-              initialValue: (ref.watch(finampSettingsProvider.currentVolume) * 100).floor() / 100.0,
-              onChange: (double currentValue) async {
-                final audioHandler = GetIt.instance<MusicPlayerBackgroundTask>();
-                audioHandler.setVolume(currentValue);
-                outputPanelLogger.fine("Volume set to $currentValue");
-              },
-              forceLoading: true,
+            // While AirPlay is the active output route, audio is rendered by the
+            // receiver and the per-app volume has no audible effect, so pin the
+            // slider to 100% and disable it. Other platforms and output modes
+            // (e.g. Bluetooth) keep the normal per-app volume control.
+            final volumeControlDisabled = ref.watch(airPlayActiveProvider).valueOrNull ?? false;
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                VolumeSlider(
+                  initialValue: volumeControlDisabled
+                      ? 1.0
+                      : (ref.watch(finampSettingsProvider.currentVolume) * 100).floor() / 100.0,
+                  enabled: !volumeControlDisabled,
+                  onChange: (double currentValue) async {
+                    final audioHandler = GetIt.instance<MusicPlayerBackgroundTask>();
+                    audioHandler.setVolume(currentValue);
+                  },
+                  forceLoading: true,
+                ),
+                if (volumeControlDisabled)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+                    child: Text(
+                      AppLocalizations.of(context)!.volumeControlDisabledCastingHint,
+                      style: Theme.of(context).textTheme.bodySmall,
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+              ],
             );
+          },
+        ),
+        Consumer(
+          builder: (context, ref, child) {
+            final volumeControlDisabled = ref.watch(airPlayActiveProvider).valueOrNull ?? false;
+            return isDesktop && !volumeControlDisabled
+                ? Center(
+                    child: Text(
+                      AppLocalizations.of(context)!.volumeControlHint(
+                        "${GlobalShortcuts.getDisplay(VolumeUpIntent)} / "
+                        "${GlobalShortcuts.getDisplay(VolumeDownIntent)}",
+                      ),
+                      style: Theme.of(context).textTheme.bodySmall,
+                      textAlign: TextAlign.center,
+                    ),
+                  )
+                : SizedBox.shrink();
           },
         ),
         const SizedBox(height: 10),
@@ -96,7 +132,7 @@ Future<void> showOutputMenu({required BuildContext context, bool usePlayerTheme 
           ),
       ];
       // TODO better estimate, how to deal with lag getting playlists?
-      var stackHeight = MediaQuery.sizeOf(context).height * (Platform.isAndroid ? 0.65 : 0.4);
+      var stackHeight = MediaQuery.heightOf(context) * (Platform.isAndroid ? 0.65 : 0.4);
       return (stackHeight, menu);
     },
   );
@@ -133,7 +169,7 @@ class OutputMenuHeader extends ConsumerWidget {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8.0),
               child: AnimatedSwitcher(
-                duration: MediaQuery.of(context).disableAnimations ? Duration.zero : const Duration(milliseconds: 1000),
+                duration: MediaQuery.disableAnimationsOf(context) ? Duration.zero : const Duration(milliseconds: 1000),
                 switchOutCurve: const Threshold(0.0),
                 child: Consumer(
                   builder: (context, ref, child) {
@@ -294,12 +330,14 @@ class VolumeSlider extends ConsumerStatefulWidget {
     required this.onChange,
     this.forceLoading = false,
     this.feedback = true,
+    this.enabled = true,
   });
 
   final double initialValue;
   final bool forceLoading;
   final Future<void> Function(double currentValue) onChange;
   final bool feedback;
+  final bool enabled;
 
   @override
   ConsumerState<VolumeSlider> createState() => _VolumeSliderState();
@@ -329,75 +367,83 @@ class _VolumeSliderState extends ConsumerState<VolumeSlider> {
     double sliderHeight = 56.0;
     return Padding(
       padding: const EdgeInsets.only(left: 12.0, right: 12.0, top: 4.0, bottom: 4.0),
-      child: Container(
-        decoration: ShapeDecoration(
-          color: themeColor.withOpacity(0.3),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-        clipBehavior: Clip.antiAlias,
-        padding: EdgeInsets.zero,
-        child: Stack(
-          children: [
-            SizedBox(
-              height: sliderHeight,
-              width: double.infinity,
-              child: SliderTheme(
-                data: SliderThemeData(
-                  trackHeight: sliderHeight, // Same as container height
-                  padding: EdgeInsets.zero,
+      child: Opacity(
+        opacity: widget.enabled ? 1.0 : 0.6,
+        child: Container(
+          decoration: ShapeDecoration(
+            color: themeColor.withOpacity(0.3),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+          clipBehavior: Clip.antiAlias,
+          padding: EdgeInsets.zero,
+          child: Stack(
+            children: [
+              SizedBox(
+                height: sliderHeight,
+                width: double.infinity,
+                child: SliderTheme(
+                  data: SliderThemeData(
+                    trackHeight: sliderHeight,
+                    // Same as container height
+                    padding: EdgeInsets.zero,
 
-                  trackShape: RoundedRectangleTrackShape(),
-                  thumbShape: VerticalSliderThumbShape(
-                    thumbWidth: 2.0,
-                    thumbHeight: 24.0,
-                    borderRadius: 8.0,
-                    offsetLeft: -9.0,
+                    trackShape: RoundedRectangleTrackShape(),
+                    thumbShape: VerticalSliderThumbShape(
+                      thumbWidth: 2.0,
+                      thumbHeight: 24.0,
+                      borderRadius: 8.0,
+                      offsetLeft: -9.0,
+                    ),
+                    thumbColor: Colors.white,
+                    activeTrackColor: themeColor,
+                    inactiveTrackColor: themeColor.withOpacity(0.3),
+                    overlayShape: SliderComponentShape.noOverlay,
                   ),
-                  thumbColor: Colors.white,
-                  activeTrackColor: themeColor,
-                  inactiveTrackColor: themeColor.withOpacity(0.3),
-                  overlayShape: SliderComponentShape.noOverlay,
-                ),
-                child: Slider(
-                  value: currentValue,
-                  onChanged: (value) {
-                    setState(() {
-                      currentValue = value;
-                    });
-                    if (debounce?.isActive ?? false) debounce!.cancel();
-                    debounce = Timer(const Duration(milliseconds: 100), () {
-                      widget.onChange(value);
-                    });
-                  },
-                  onChangeEnd: (value) async {
-                    unawaited(widget.onChange(value));
-                    if (widget.feedback) {
-                      FeedbackHelper.feedback(FeedbackType.selection);
-                    }
-                    setState(() {
-                      currentValue = value;
-                    });
-                  },
-                  autofocus: false,
-                  focusNode: FocusNode(skipTraversal: true, canRequestFocus: false),
-                ),
-              ),
-            ),
-            Positioned(
-              top: 0,
-              bottom: 0,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: Text(
-                  "${(currentValue * 100).floor()}%",
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600, color: Colors.white),
+                  child: Slider(
+                    value: currentValue,
+                    // A null callback disables the slider; used while AirPlay is
+                    // active so the per-app volume stays pinned at 100%.
+                    onChanged: !widget.enabled
+                        ? null
+                        : (value) {
+                            setState(() {
+                              currentValue = value;
+                            });
+                            if (debounce?.isActive ?? false) debounce!.cancel();
+                            debounce = Timer(const Duration(milliseconds: 100), () {
+                              widget.onChange(value);
+                            });
+                          },
+                    onChangeEnd: (value) async {
+                      unawaited(widget.onChange(value));
+                      if (widget.feedback) {
+                        FeedbackHelper.feedback(FeedbackType.selection);
+                      }
+                      setState(() {
+                        currentValue = value;
+                      });
+                    },
+                    autofocus: false,
+                    focusNode: FocusNode(skipTraversal: true, canRequestFocus: false),
+                  ),
                 ),
               ),
-            ),
-          ],
+              Positioned(
+                top: 0,
+                bottom: 0,
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: Text(
+                    "${(currentValue * 100).floor()}%",
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600, color: Colors.white),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -451,9 +497,6 @@ class RoundedRectangleTrackShape extends RoundedRectSliderTrackShape {
       thumbCenter.dx + sliderTheme.thumbShape!.getPreferredSize(isEnabled, isDiscrete).width,
       trackRect.bottom,
     );
-
-    // Inactive track
-    final inactiveRect = Rect.fromLTRB(thumbCenter.dx, trackRect.top, trackRect.right, trackRect.bottom);
 
     final Paint activePaint = Paint()..color = sliderTheme.activeTrackColor!;
     final Paint inactivePaint = Paint()..color = sliderTheme.inactiveTrackColor!;

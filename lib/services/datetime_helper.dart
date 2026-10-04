@@ -1,6 +1,6 @@
 import 'package:finamp/l10n/app_localizations.dart';
 import 'package:finamp/services/finamp_settings_helper.dart';
-import 'package:finamp/services/locale_helper.dart';
+import 'package:finamp/utils/locale_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -11,20 +11,24 @@ class ReleaseDateHelper {
   /// Formats the release date of a [BaseItemDto] based on the user's settings.
   static String? autoFormat(BaseItemDto? baseItem) {
     final format = FinampSettingsHelper.finampSettings.releaseDateFormat;
+    final locale = getDateFormatLocaleString();
 
     final premiereDate = baseItem?.premiereDate != null ? DateTime.parse(baseItem!.premiereDate!) : null;
-    if (premiereDate == null) {
+    // Ignore premiere date if null or set to .NET DateTimne.MinValue
+    if (premiereDate == null || premiereDate.year <= 1) {
       return baseItem?.productionYear?.toString();
     }
     switch (format) {
-      case ReleaseDateFormat.year:
-        return DateFormat.y().format(premiereDate);
-      case ReleaseDateFormat.iso:
+      case ReleaseDateFormat.year: // Example: 2022
+        return DateFormat.y(locale).format(premiereDate);
+      case ReleaseDateFormat.iso: // Example: 2022-03-02
         return premiereDate.toIso8601String().split("T").first;
-      case ReleaseDateFormat.monthYear:
-        return "${DateFormat.MMMM().format(premiereDate)} ${DateFormat.y().format(premiereDate)}";
-      case ReleaseDateFormat.monthDayYear:
-        return "${DateFormat.MMMM().format(premiereDate)} ${DateFormat.d().format(premiereDate)}, ${DateFormat.y().format(premiereDate)}";
+      case ReleaseDateFormat.monthYear: // Example: March, 2022
+        return DateFormat.yMMMM(locale).format(premiereDate);
+      case ReleaseDateFormat.monthDayYear: // Example: March 2, 2022 (en_us) or 2 March 2022 (en_gb)
+        return DateFormat.yMMMMd(locale).format(premiereDate);
+      case ReleaseDateFormat.numerical: // Example: 3/2/2022 (en_us) or 02/03/2022 (en_gb)
+        return DateFormat.yMd(locale).format(premiereDate);
     }
   }
 }
@@ -32,7 +36,7 @@ class ReleaseDateHelper {
 class DateTimeHelper {
   static String format(DateTime dateTime) {
     final now = DateTime.now();
-    final locale = LocaleHelper.localeString;
+    final locale = getDateFormatLocaleString();
 
     final isSameDay = dateTime.year == now.year && dateTime.month == now.month && dateTime.day == now.day;
 
@@ -99,7 +103,7 @@ class DateTimeHelper {
     }
 
     final isSameYear = dateTime.year == now.year;
-    final locale = LocaleHelper.localeString;
+    final locale = getDateFormatLocaleString();
     final format = isSameYear ? DateFormat.MMMMd(locale) : DateFormat.yMMMd(locale);
 
     return format.format(dateTime);
@@ -148,7 +152,13 @@ class RelativeDateTimeText extends StatelessWidget {
           dateTime: dateTime,
           includeStaticDateTime: includeStaticDateTime,
         );
-        return Text(text, style: style, textScaler: disableTextScaling ? TextScaler.noScaling : null);
+        return Text(
+          text,
+          style: style,
+          textScaler: disableTextScaling ? TextScaler.noScaling : null,
+          maxLines: 1,
+          overflow: TextOverflow.fade,
+        );
       },
     );
   }

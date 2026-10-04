@@ -1,5 +1,5 @@
 import 'package:audio_service_platform_interface/audio_service_platform_interface.dart';
-import 'package:flutter/cupertino.dart';
+import 'package:flutter/cupertino.dart' hide RepeatMode;
 import 'package:smtc_windows/smtc_windows.dart';
 
 class AudioServiceSMTC extends AudioServicePlatform {
@@ -31,7 +31,7 @@ class AudioServiceSMTC extends AudioServicePlatform {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       try {
         // Listen to button events and update playback status accordingly
-        smtc.buttonPressStream.listen((event) async {
+        smtc.buttonPressStream.listen((PressedButton event) async {
           switch (event) {
             case PressedButton.play:
               await _handlerCallbacks!.play(const PlayRequest());
@@ -84,8 +84,6 @@ class AudioServiceSMTC extends AudioServicePlatform {
 
   @override
   Future<void> setMediaItem(SetMediaItemRequest request) async {
-    // Note - smtc_windows does not accept file:// URIs.  Only network images
-    // are currently supported.
     var artURI = request.mediaItem.artUri;
     await smtc.updateMetadata(
       MusicMetadata(
