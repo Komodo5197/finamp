@@ -54,11 +54,8 @@ dependencies:
   smtc_windows:
     git:
       url: https://github.com/Komodo5197/frb_plugins.git
-      ref: 7ece49cc16a459aaa0718ed23458802533daef37
+      ref: 0b8d918172fb478157bf4d4d7648a21720a42a0d
       path: packages/smtc_windows/
-  # Despite having loose version constraints, smtc_windows and flutter_discord_rpc actually depend on the
-  # specific version 2.11.1, so we must force it.
-  flutter_rust_bridge: 2.11.1
 
   audio_service: ^0.18.18
   audio_service_mpris: ^0.2.0
@@ -146,7 +143,11 @@ dependencies:
   gaimon: ^1.4.0
   http: ^1.4.0
   app_links: ^7.2.1
-  flutter_discord_rpc: ^1.0.0
+  flutter_discord_rpc:
+    git:
+      url: https://github.com/Komodo5197/frb_plugins.git
+      ref: 0b8d918172fb478157bf4d4d7648a21720a42a0d
+      path: packages/flutter_discord_rpc/
   shared_preferences: ^2.5.3
   flex_color_picker: ^4.0.0
   dynamic_color: ^2.1.0
