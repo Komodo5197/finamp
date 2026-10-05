@@ -18,7 +18,7 @@ publish_to: "none" # Remove this line if you wish to publish to pub.dev
 version: 1.0.1+201
 
 environment:
-  sdk: ^3.9.0
+  sdk: ^3.13.0
 
 dependencies:
   flutter:
@@ -98,13 +98,8 @@ dependencies:
       url: https://github.com/odriverobotics/split_view.git
       ref: 8b2b0f0e1c8470183cb2df40815a05bfdb3fe219
   share_plus: ^12.0.0
-  isar: ^3.1.0
-  # Use version of isar core with android compilation fixes.  If this version or ref changes,
-  # the linux arm build in upload-assets.yml must be updated.
-  isar_flutter_libs:
-    git:
-      url: https://github.com/Komodo5197/isar_flutter_libs.git
-      ref: 21c20862e94bb33fca9e9c14b5ca72fc41307f4b
+  isar_community: 3.3.2
+  isar_community_flutter_libs: ^3.3.2
 
   path: ^1.9.0
   path_provider_platform_interface: ^2.1.2
@@ -117,8 +112,8 @@ dependencies:
       ref: 4992c3b
       path: packages/palette_generator
   flutter_tabler_icons: ^1.43.0
-  flutter_riverpod: ^2.6.1
-  riverpod_annotation: ^2.6.1
+  flutter_riverpod: ^3.4.3
+  riverpod_annotation: ^4.0.0
   locale_names: ^1.1.1
   flutter_cache_manager: ^3.4.1
   # fix not showing elipses when maxLines==1
@@ -136,9 +131,9 @@ dependencies:
   focus_on_it: ^2.0.1
   flutter_svg: ^2.0.17
   meta: ^1.15.0
-  analyzer: ^7.0.0
-  build: ^2.4.2
-  source_gen: ^2.0.0
+  analyzer: ^14.4.0
+  build: ^4.0.7
+  source_gen: ^4.2.4
   web_socket_channel: ^3.0.2
   connectivity_plus: ^7.0.0
   progress_border: ^0.1.5
@@ -173,26 +168,21 @@ dev_dependencies:
   json_serializable: ^6.9.0
   flutter_launcher_icons: ^0.14.1
   flutter_lints: ^6.0.0
-  riverpod_generator: ^2.6.1
-  custom_lint: ^0.7.0
-  riverpod_lint: ^2.6.3
-  # This fork updates isar_generator with analyzer 7.0.0 compatibility
-  isar_generator:
-    git:
-      url: https://github.com/callumw-k/isar.git
-      ref: f070a067378c215b9212a2a22ea593293671c9c9
-      path: packages/isar_generator
+  riverpod_generator: ^4.0.0+1
+  isar_community_generator: 3.3.2
   msix: ^3.16.9
 
 dependency_overrides:
-  # force isar_generator community fork to accept baseline isar.
-  # generated files are identical, so there should be no incompatibilities
-  # fork also allows custom build of linux arm binaries
-  isar:
+  isar_community:
     git:
       url: https://github.com/Komodo5197/isar-community.git
-      ref: a602cd8999048faba043f7e1ce7ba92f4d812762
-      path: packages/isar
+      ref: v3-linux-arm
+      path: packages/isar_community
+  isar_community_generator:
+      git:
+        url: https://github.com/reedom/isar-community.git
+        ref: feat/analyzer-14
+        path: packages/isar_community_generator
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

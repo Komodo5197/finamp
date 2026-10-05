@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_blurhash/flutter_blurhash.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_tabler_icons/flutter_tabler_icons.dart';
 import 'package:octo_image/src/image/fade_widget.dart';
 import 'package:uuid/v4.dart';

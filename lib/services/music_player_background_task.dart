@@ -404,9 +404,7 @@ class MusicPlayerBackgroundTask extends BaseAudioHandler with SeekHandler, Queue
               FinampSettingsHelper.finampSettings.bufferDisableSizeConstraints
               ? (maxBufferDuration + Duration(seconds: 90))
               : maxBufferDuration,
-          prioritizeTimeOverSizeThresholds: FinampSettingsHelper
-              .finampSettings
-              .bufferDisableSizeConstraints, // targetBufferBytes sets the absolute maximum, but if this false and maxBufferDuration is reached, buffering will end
+          prioritizeTimeOverSizeThresholds: FinampSettingsHelper.finampSettings.bufferDisableSizeConstraints, // targetBufferBytes sets the absolute maximum, but if this false and maxBufferDuration is reached, buffering will end
           bufferForPlaybackDuration: Duration(seconds: 5),
           bufferForPlaybackAfterRebufferDuration: Duration(seconds: 10),
         ),
@@ -432,9 +430,10 @@ class MusicPlayerBackgroundTask extends BaseAudioHandler with SeekHandler, Queue
     }
 
     // calculate base volume gain for iOS as a linear factor, because just_audio doesn't yet support AudioEffect on iOS
-    iosBaseVolumeGainFactor =
-        pow(10.0, FinampSettingsHelper.finampSettings.volumeNormalizationIOSBaseGain / 20.0)
-            as double; // https://sound.stackexchange.com/questions/38722/convert-db-value-to-linear-scale
+    iosBaseVolumeGainFactor = pow(
+      10.0,
+      FinampSettingsHelper.finampSettings.volumeNormalizationIOSBaseGain / 20.0,
+    ) as double; // https://sound.stackexchange.com/questions/38722/convert-db-value-to-linear-scale
     if (_loudnessEnhancerEffect == null) {
       _volumeNormalizationLogger.info("non-Android base volume gain factor: $iosBaseVolumeGainFactor");
     }
@@ -473,9 +472,10 @@ class MusicPlayerBackgroundTask extends BaseAudioHandler with SeekHandler, Queue
       prevNormActive = normalizationActive;
       prevNormMode = normalizationMode;
       // update replay gain settings every time settings are changed
-      iosBaseVolumeGainFactor =
-          pow(10.0, iosGain / 20.0)
-              as double; // https://sound.stackexchange.com/questions/38722/convert-db-value-to-linear-scale
+      iosBaseVolumeGainFactor = pow(
+        10.0,
+        iosGain / 20.0,
+      ) as double; // https://sound.stackexchange.com/questions/38722/convert-db-value-to-linear-scale
       if (normalizationActive) {
         _loudnessEnhancerEffect?.setEnabled(true);
         _applyVolumeNormalization(mediaItem.valueOrNull);
@@ -630,15 +630,15 @@ class MusicPlayerBackgroundTask extends BaseAudioHandler with SeekHandler, Queue
   double get speed => _player.speed;
 
   @override
-  Future<void> setSpeed(final double speed) async {
+  Future<void> setSpeed(double speed) async {
     return _player.setSpeed(speed);
   }
 
-  Future<void> setPitch(final double pitch) async {
+  Future<void> setPitch(double pitch) async {
     return _player.setPitch(pitch);
   }
 
-  void setVolume(final double volume) async {
+  void setVolume(double volume) async {
     return _volume.setInternalVolume(volume);
   }
 
@@ -1192,9 +1192,7 @@ class MusicPlayerBackgroundTask extends BaseAudioHandler with SeekHandler, Queue
           // reset gain offset
           _loudnessEnhancerEffect.setTargetGain(0);
         }
-        _volume.setReplayGainVolume(
-          iosBaseVolumeGainFactor,
-        ); //!!! it's important that the base gain is used instead of 1.0, so that any tracks without normalization gain information don't fall back to full volume, but to the base volume for iOS
+        _volume.setReplayGainVolume(iosBaseVolumeGainFactor); //!!! it's important that the base gain is used instead of 1.0, so that any tracks without normalization gain information don't fall back to full volume, but to the base volume for iOS
       }
     }
   }
@@ -1338,7 +1336,7 @@ class MusicPlayerBackgroundTask extends BaseAudioHandler with SeekHandler, Queue
           FinampSettingsHelper.finampSettings.volumeNormalizationMode != VolumeNormalizationMode.hybrid) {
         return;
       }
-      if (previous?.valueOrNull?.albumNormalizationGain != next.valueOrNull?.albumNormalizationGain) {
+      if (previous?.value?.albumNormalizationGain != next.value?.albumNormalizationGain) {
         _applyVolumeNormalization(mediaItem.valueOrNull);
       }
     });
@@ -1570,7 +1568,7 @@ double? getGainForCurrentPlayback(MediaItem currentTrack, jellyfin_models.BaseIt
       // metadataProvider is still used for Jellyfin <12.0
       final albumNormalizationGain =
           baseItem.albumNormalizationGain ??
-          providerContainer.read(metadataProvider(baseItem)).valueOrNull?.albumNormalizationGain;
+          providerContainer.read(metadataProvider(baseItem)).value?.albumNormalizationGain;
 
       effectiveGainChange =
           albumNormalizationGain ??
