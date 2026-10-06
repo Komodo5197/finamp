@@ -311,34 +311,30 @@ Future<PlayableSlice> _fetchFromChildren(
 @riverpod
 Future<PlayableSlice> getAlbumShuffledPlayerSlice(Ref ref, {required FinampPlayable item}) async {
   assert(item is Genre || item is Artist || (item is FinampSortable<Album> && item is FinampPlayable));
-  final albumPlayable =
-      switch (item) {
-            FinampSortable<Album>() => item,
-            Artist artist => Artist(
-              artist.item,
-              sortConfig: SortAndFilterConfiguration.defaultSort,
-              // Only track types should get through to here
-              type: ArtistChildType.appearsOnAlbums,
-              library: artist.library,
-            ),
-            Genre genre => Genre(
-              genre.item,
-              sortConfig: SortAndFilterConfiguration.defaultSort,
-              type: GenreChildType.albums,
-              library: genre.library,
-            ),
-            _ => throw UnsupportedError("Cannot shuffle albums of $item"),
-          }
-          as FinampSortable<Album>;
-  final shuffledPlayable =
-      albumPlayable.copyWith(
-            SortAndFilterController.resolveOffline(
-              ref,
-              ContentType.albums,
-              albumPlayable.sortConfig.copyWith(sortBy: SortBy.random),
-            ),
-          )
-          as FinampPlayable;
+  final albumPlayable = switch (item) {
+    FinampSortable<Album>() => item,
+    Artist artist => Artist(
+      artist.item,
+      sortConfig: SortAndFilterConfiguration.defaultSort,
+      // Only track types should get through to here
+      type: ArtistChildType.appearsOnAlbums,
+      library: artist.library,
+    ),
+    Genre genre => Genre(
+      genre.item,
+      sortConfig: SortAndFilterConfiguration.defaultSort,
+      type: GenreChildType.albums,
+      library: genre.library,
+    ),
+    _ => throw UnsupportedError("Cannot shuffle albums of $item"),
+  } as FinampSortable<Album>;
+  final shuffledPlayable = albumPlayable.copyWith(
+    SortAndFilterController.resolveOffline(
+      ref,
+      ContentType.albums,
+      albumPlayable.sortConfig.copyWith(sortBy: SortBy.random),
+    ),
+  ) as FinampPlayable;
   final slice = await ref.watch(getPlayableSliceProvider(item: shuffledPlayable, startingOffset: 0).future);
   return slice.markPreshuffled();
   // return GroupedPlayableSlice(parent: slice, groupBy: (element) => element.albumId?.toString());

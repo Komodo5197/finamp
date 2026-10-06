@@ -1192,9 +1192,8 @@ class QueueSectionHeader extends ConsumerWidget {
                     ? AppLocalizations.of(
                         context,
                       )!.radioModeRandomUnavailableNotDownloadedSubtitle(radioModeTranslatedName, radioSeedItem!.name!)
-                    : AppLocalizations.of(
-                        context,
-                      )!.radioModeRandomUnavailableNotDownloadedGenericSubtitle(radioModeTranslatedName),
+                    : AppLocalizations.of(context)!
+                          .radioModeRandomUnavailableNotDownloadedGenericSubtitle(radioModeTranslatedName),
               RadioModeAvailabilityStatus.unavailableQueueEmpty => AppLocalizations.of(
                 context,
               )!.radioModeUnavailableQueueEmptySubtitle(radioModeTranslatedName),

@@ -575,9 +575,8 @@ class _ResponsiveListTile extends StatelessWidget {
                   Padding(
                     padding: const EdgeInsets.only(top: 2.0),
                     child: DefaultTextStyle(
-                      style: Theme.of(
-                        context,
-                      ).textTheme.bodySmall!.copyWith(color: ColorScheme.of(context).onSurface.withOpacity(0.6)),
+                      style: Theme.of(context).textTheme.bodySmall!
+                          .copyWith(color: ColorScheme.of(context).onSurface.withOpacity(0.6)),
                       child: Wrap(spacing: 12.0, runSpacing: 4.0, children: subtitleWidgets ?? []),
                     ),
                   ),
@@ -610,9 +609,8 @@ class _ResponsiveListTile extends StatelessWidget {
                     Padding(
                       padding: const EdgeInsets.only(top: 2.0),
                       child: DefaultTextStyle(
-                        style: Theme.of(
-                          context,
-                        ).textTheme.bodySmall!.copyWith(color: ColorScheme.of(context).onSurface.withOpacity(0.6)),
+                        style: Theme.of(context).textTheme.bodySmall!
+                            .copyWith(color: ColorScheme.of(context).onSurface.withOpacity(0.6)),
                         child: Wrap(spacing: 12.0, runSpacing: 4.0, children: subtitleWidgets ?? []),
                       ),
                     ),

@@ -682,9 +682,9 @@ class CarPlayHelper {
         type: ArtistChildType.albumsFromArtist,
         library: currentLibraryPlaceholder,
       );
-      final artistAlbumsList = (await providerRef.read(
-        getChildrenProvider(item: artist).future,
-      )).map((x) => (x as FinampPlayableDto).item).toList();
+      final artistAlbumsList = (await providerRef.read(getChildrenProvider(item: artist).future))
+          .map((x) => (x as FinampPlayableDto).item)
+          .toList();
       _carPlayLogger.fine("Got ${artistAlbumsList.length} albums");
 
       artistAlbums.items.add(
