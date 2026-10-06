@@ -83,13 +83,14 @@ dependencies:
   uuid: ^4.5.1
   infinite_scroll_pagination: ^5.0.0
   flutter_sticky_header: ^0.8.0
-  # TODO: switch to regular `flutter_user_certificates_android` when this PR is
-  # merged:
-  # <https://github.com/johnstef99/flutter_user_certificates_android/pull/2>.
+
+  # Merge of android cert trusting PR was rejected, so we will likely stay on this fork indefinitely.
+  # Based off upstream v0.1.0
+  # https://github.com/johnstef99/flutter_user_certificates_android/pull/2
   flutter_user_certificates_android:
     git:
-      url: https://github.com/jfly/flutter_user_certificates_android.git
-      ref: db81e4ff3222a7db1308ed03c4bc3142c0d271d5
+      url: https://github.com/finamp-app/flutter_user_certificates_android.git
+      ref: 6ee5da677f9e50d7f179bb652933a82a2b141735
   device_info_plus: ^13.3.0
   package_info_plus: ^10.2.2
   octo_image: ^2.0.0
