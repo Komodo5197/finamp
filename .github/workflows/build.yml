@@ -280,6 +280,8 @@ jobs:
       if: matrix.arch == 'x64'
       run: |
         sh tool/build_linux.sh x64
+        find .
+        find $HOME/.pub-cache
         mv libisar_linux_x64.so $HOME/.pub-cache/hosted/pub.dev/isar_community_flutter_libs-*/linux/libisar.x64.so
       working-directory: isar
     
