@@ -733,11 +733,11 @@ packages:
     dependency: "direct main"
     description:
       path: "."
-      ref: db81e4ff3222a7db1308ed03c4bc3142c0d271d5
-      resolved-ref: db81e4ff3222a7db1308ed03c4bc3142c0d271d5
-      url: "https://github.com/jfly/flutter_user_certificates_android.git"
+      ref: "6ee5da677f9e50d7f179bb652933a82a2b141735"
+      resolved-ref: "6ee5da677f9e50d7f179bb652933a82a2b141735"
+      url: "https://github.com/finamp-app/flutter_user_certificates_android.git"
     source: git
-    version: "0.0.1"
+    version: "0.1.0"
   flutter_web_plugins:
     dependency: transitive
     description: flutter
