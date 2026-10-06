@@ -273,18 +273,18 @@ jobs:
       if: matrix.arch == 'arm64'
       run: |
         sh tool/build_linux.sh aarch64
+        ls /
         ls $PUB_CACHE/hosted/pub.dev/
-        ls $PUB_CACHE/git/
-        mv libisar_linux_arm64.so $PUB_CACHE/hosted/pub.dev/isar_community_flutter_libs-*/linux/libisar.aarch64.so
+        ls $PUB_CACHE/hosted/pub.dev/isar_community_flutter_libs-3.3.2/
+        ls $PUB_CACHE/hosted/pub.dev/isar_community_flutter_libs-*/
+        mv libisar_linux_arm64.so $PUB_CACHE/hosted/pub.dev/isar_community_flutter_libs-3.3.2/linux/libisar.aarch64.so
       working-directory: isar
 
     - name: Build isar core and inject into cached isar_flutter_libs (x64)
       if: matrix.arch == 'x64'
       run: |
         sh tool/build_linux.sh x64
-        ls $PUB_CACHE/hosted/pub.dev/
-        ls $PUB_CACHE/git/
-        mv libisar_linux_x64.so $PUB_CACHE/hosted/pub.dev/isar_community_flutter_libs-*/linux/libisar.x64.so
+        mv libisar_linux_x64.so $PUB_CACHE/hosted/pub.dev/isar_community_flutter_libs-3.3.2/linux/libisar.x64.so
       working-directory: isar
     
     - run: flutter build linux --release --no-pub
