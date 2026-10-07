@@ -1,6 +1,6 @@
-import 'package:flutter/material.dart';
 import 'package:finamp/components/finamp_app_bar_back_button.dart';
 import 'package:finamp/l10n/app_localizations.dart';
+import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 import 'package:rxdart/rxdart.dart';
 
@@ -54,9 +54,7 @@ class ActiveDownloadsScreen extends StatelessWidget {
                       // with bright theme
                       // https://material.io/design/iconography/system-icons.html#color
                       color: Theme.of(context).iconTheme.color
-                          ?.withValues(
-                        alpha: Theme.brightnessOf(context) == Brightness.light ? 0.38 : 0.5,
-                      ),
+                          ?.withValues(alpha: Theme.brightnessOf(context) == Brightness.light ? 0.38 : 0.5),
                     ),
                     const Padding(padding: EdgeInsets.all(8.0)),
                     Text(AppLocalizations.of(context)!.noActiveDownloads),

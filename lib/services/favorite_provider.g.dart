@@ -61,7 +61,7 @@ final class IsFavoriteProvider extends $NotifierProvider<IsFavorite, bool> {
   }
 }
 
-String _$isFavoriteHash() => r'17de83e9b2130cb5d9e56891b87bba327371fa60';
+String _$isFavoriteHash() => r'10d88c0ff1284e7390cc2c052b11fca67fecf560';
 
 final class IsFavoriteFamily extends $Family
     with $ClassFamilyOverride<IsFavorite, bool, bool, bool, BaseItemDto?> {

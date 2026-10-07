@@ -74,7 +74,7 @@ final class PagedContentProvider<ChildType extends FinampDisplayableOrPlayable>
   }
 }
 
-String _$pagedContentHash() => r'd7ad89dc3b1af76891de2ebc26ddc518c44a7e65';
+String _$pagedContentHash() => r'25eb9678f1dea2a6bd5ff22ae4c3bf2cdf6e1daa';
 
 final class PagedContentFamily extends $Family {
   PagedContentFamily._()
@@ -237,7 +237,7 @@ final class LoadHomeSectionItemsProvider
 }
 
 String _$loadHomeSectionItemsHash() =>
-    r'03d5a2113df428ecafabb89f08f4b1fa56f90de0';
+    r'79de212cae057856d0c2c10ef7dea9dc84ede6d4';
 
 final class LoadHomeSectionItemsFamily extends $Family
     with
@@ -269,6 +269,95 @@ final class LoadHomeSectionItemsFamily extends $Family
 
   @override
   String toString() => r'loadHomeSectionItemsProvider';
+}
+
+/// Total item count for [request], ignoring pagination. CarPlay uses this to
+/// decide whether a view needs the letter picker.
+
+@ProviderFor(musicScreenItemCount)
+final musicScreenItemCountProvider = MusicScreenItemCountFamily._();
+
+/// Total item count for [request], ignoring pagination. CarPlay uses this to
+/// decide whether a view needs the letter picker.
+
+final class MusicScreenItemCountProvider
+    extends $FunctionalProvider<AsyncValue<int>, int, FutureOr<int>>
+    with $FutureModifier<int>, $FutureProvider<int> {
+  /// Total item count for [request], ignoring pagination. CarPlay uses this to
+  /// decide whether a view needs the letter picker.
+  MusicScreenItemCountProvider._({
+    required MusicScreenItemCountFamily super.from,
+    required MusicScreenPlayable<FinampPlayableDto> super.argument,
+  }) : super(
+         retry: null,
+         name: r'musicScreenItemCountProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$musicScreenItemCountHash();
+
+  @override
+  String toString() {
+    return r'musicScreenItemCountProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $FutureProviderElement<int> $createElement($ProviderPointer pointer) =>
+      $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<int> create(Ref ref) {
+    final argument = this.argument as MusicScreenPlayable<FinampPlayableDto>;
+    return musicScreenItemCount(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is MusicScreenItemCountProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$musicScreenItemCountHash() =>
+    r'c49c43e47599e8b6f4f7bc6280fa844767f0eee8';
+
+/// Total item count for [request], ignoring pagination. CarPlay uses this to
+/// decide whether a view needs the letter picker.
+
+final class MusicScreenItemCountFamily extends $Family
+    with
+        $FunctionalFamilyOverride<
+          FutureOr<int>,
+          MusicScreenPlayable<FinampPlayableDto>
+        > {
+  MusicScreenItemCountFamily._()
+    : super(
+        retry: null,
+        name: r'musicScreenItemCountProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// Total item count for [request], ignoring pagination. CarPlay uses this to
+  /// decide whether a view needs the letter picker.
+
+  MusicScreenItemCountProvider call(
+    MusicScreenPlayable<FinampPlayableDto> request,
+  ) => MusicScreenItemCountProvider._(argument: request, from: this);
+
+  @override
+  String toString() => r'musicScreenItemCountProvider';
 }
 
 @ProviderFor(getJellyfinCollection)
@@ -329,7 +418,7 @@ final class GetJellyfinCollectionProvider
 }
 
 String _$getJellyfinCollectionHash() =>
-    r'a0f53ba1d31000864d5a81b22ecc132f0bd99934';
+    r'1c7ade2240687f4de0fb3a93b51f27a97fb80e8a';
 
 final class GetJellyfinCollectionFamily extends $Family
     with
