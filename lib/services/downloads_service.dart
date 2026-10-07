@@ -233,7 +233,7 @@ class DownloadsService {
                   unawaited(
                     File(listener.file!.path)
                         .rename(listener.file!.path.replaceFirst(RegExp(r'\.image$'), extension))
-                        .then((_) => null, onError: (e) => GlobalSnackbar.error(e)),
+                        .then((_) => null, onError: (Object e) => GlobalSnackbar.error(e)),
                   );
                   listener.path = listener.path!.replaceFirst(RegExp(r'\.image$'), extension);
                 }
@@ -574,14 +574,14 @@ class DownloadsService {
         (DownloadItemType.finampCollection, null),
         (
           DownloadItemType.collection,
-          (q) => q.allOf([
+          (q) => q.allOf<BaseItemDtoType, dynamic>([
             BaseItemDtoType.album,
             BaseItemDtoType.playlist,
           ], (q, element) => q.not().baseItemTypeEqualTo(element)),
         ),
         (
           DownloadItemType.collection,
-          (q) => q.anyOf([
+          (q) => q.anyOf<BaseItemDtoType, dynamic>([
             BaseItemDtoType.album,
             BaseItemDtoType.playlist,
           ], (q, element) => q.baseItemTypeEqualTo(element)),
@@ -598,10 +598,19 @@ class DownloadsService {
             .filter()
             .optional(requireFilters[i].$2 != null, (q) => requireFilters[i].$2!(q))
             .requires(
-              (q) => q.anyOf(
-                requireFilters.slice(0, i + 1),
-                (q, element) => q.typeEqualTo(element.$1).optional(element.$2 != null, (q) => element.$2!(q)),
-              ),
+              (q) =>
+                  q.anyOf<
+                    (
+                      DownloadItemType,
+                      QueryBuilder<DownloadItem, DownloadItem, QAfterFilterCondition> Function(
+                        QueryBuilder<DownloadItem, DownloadItem, QFilterCondition>,
+                      )?,
+                    ),
+                    dynamic
+                  >(
+                    requireFilters.slice(0, i + 1),
+                    (q, element) => q.typeEqualTo(element.$1).optional(element.$2 != null, (q) => element.$2!(q)),
+                  ),
             )
             .findAllSync();
         for (var item in items) {
@@ -624,14 +633,14 @@ class DownloadsService {
         (DownloadItemType.finampCollection, null),
         (
           DownloadItemType.collection,
-          (q) => q.anyOf([
+          (q) => q.anyOf<BaseItemDtoType, dynamic>([
             BaseItemDtoType.album,
             BaseItemDtoType.playlist,
           ], (q, element) => q.baseItemTypeEqualTo(element)),
         ),
         (
           DownloadItemType.collection,
-          (q) => q.allOf([
+          (q) => q.allOf<BaseItemDtoType, dynamic>([
             BaseItemDtoType.album,
             BaseItemDtoType.playlist,
           ], (q, element) => q.not().baseItemTypeEqualTo(element)),
@@ -650,10 +659,19 @@ class DownloadsService {
             .requiredByIsEmpty()
             .optional(infoFilters[i].$2 != null, (q) => infoFilters[i].$2!(q))
             .info(
-              (q) => q.anyOf(
-                infoFilters.slice(0, i + 1),
-                (q, element) => q.typeEqualTo(element.$1).optional(element.$2 != null, (q) => element.$2!(q)),
-              ),
+              (q) =>
+                  q.anyOf<
+                    (
+                      DownloadItemType,
+                      QueryBuilder<DownloadItem, DownloadItem, QAfterFilterCondition> Function(
+                        QueryBuilder<DownloadItem, DownloadItem, QFilterCondition>,
+                      )?,
+                    ),
+                    dynamic
+                  >(
+                    infoFilters.slice(0, i + 1),
+                    (q, element) => q.typeEqualTo(element.$1).optional(element.$2 != null, (q) => element.$2!(q)),
+                  ),
             )
             .findAllSync();
         for (var item in items) {
@@ -664,7 +682,7 @@ class DownloadsService {
       }
     });
     // Allow other tasks to run between these steps, which are both synchronous
-    await Future.delayed(const Duration(milliseconds: 100));
+    await Future<void>.delayed(const Duration(milliseconds: 100));
 
     // Step 2 - Get all items into correct state matching filesystem and downloader.
     _downloadsLogger.info("Starting downloads repair step 2");
@@ -796,19 +814,19 @@ class DownloadsService {
     var imageFilePaths =
         Directory(path_helper.join(FinampSettingsHelper.finampSettings.internalTrackDir.currentPath, "images"))
             .list()
-            .handleError((e) => _downloadsLogger.info("Error while cleaning image directories: $e"))
+            .handleError((Object e) => _downloadsLogger.info("Error while cleaning image directories: $e"))
             .where((event) => event is File)
             .map((event) => path_helper.canonicalize(event.path));
     var filePaths = await imageFilePaths.toSet();
-    // This cleans FINAMP_BASE_DOWNLOAD_DIRECTORY in internalSupport
+    // This cleans finampBaseDownloadDirectory in internalSupport
     // and internalDocuments
     for (var trackBasePath
         in FinampSettingsHelper.finampSettings.downloadLocationsMap.values
             .where((element) => !element.baseDirectory.needsPath)
             .map((e) => e.currentPath)) {
-      var trackFilePaths = Directory(path_helper.join(trackBasePath, FINAMP_BASE_DOWNLOAD_DIRECTORY))
+      var trackFilePaths = Directory(path_helper.join(trackBasePath, finampBaseDownloadDirectory))
           .list()
-          .handleError((e) => _downloadsLogger.info("Error while cleaning track directories: $e"))
+          .handleError((Object e) => _downloadsLogger.info("Error while cleaning track directories: $e"))
           .where((event) => event is File)
           .map((event) => path_helper.canonicalize(event.path));
       filePaths.addAll(await trackFilePaths.toSet());
@@ -1076,7 +1094,7 @@ class DownloadsService {
     unawaited(
       repairAllDownloads().then(
         (value) => null,
-        onError: (error) {
+        onError: (Object error) {
           _downloadsLogger.severe("Error $error in hive migration downloads repair.");
           GlobalSnackbar.show(
             (scaffold) => SnackBar(
@@ -1127,7 +1145,7 @@ class DownloadsService {
                   .where((element) => element.baseDirectory == DownloadLocationType.internalDocuments)
                   .first
                   .id)
-          ? path_helper.join(FINAMP_BASE_DOWNLOAD_DIRECTORY, image.path)
+          ? path_helper.join(finampBaseDownloadDirectory, image.path)
           : image.path;
       isarItem.state = DownloadItemState.complete;
       isarItem.fileTranscodingProfile = DownloadProfile(downloadLocationId: image.downloadLocationId);
@@ -1181,7 +1199,7 @@ class DownloadsService {
                 .where((element) => element.baseDirectory == DownloadLocationType.internalDocuments)
                 .first
                 .id) {
-          newPath = path_helper.join(FINAMP_BASE_DOWNLOAD_DIRECTORY, track.path);
+          newPath = path_helper.join(finampBaseDownloadDirectory, track.path);
         } else {
           newPath = track.path;
         }
@@ -1337,7 +1355,7 @@ class DownloadsService {
                 q.stateEqualTo(DownloadItemState.complete).or().stateEqualTo(DownloadItemState.needsRedownloadComplete),
           ),
         )
-        .optional(onlyFavorites, (q) => q.anyOf(favoriteIds, (q, v) => q.isarIdEqualTo(v)))
+        .optional(onlyFavorites, (q) => q.anyOf<int, dynamic>(favoriteIds, (q, v) => q.isarIdEqualTo(v)))
         // Returns items that have a certain genreId assigned
         .optional(
           genreFilter != null,
@@ -1383,7 +1401,7 @@ class DownloadsService {
           (q) =>
               q.stateEqualTo(DownloadItemState.complete).or().stateEqualTo(DownloadItemState.needsRedownloadComplete),
         )
-        .optional(onlyFavorites, (q) => q.anyOf(favoriteIds, (q, v) => q.isarIdEqualTo(v)))
+        .optional(onlyFavorites, (q) => q.anyOf<int, dynamic>(favoriteIds, (q, v) => q.isarIdEqualTo(v)))
         .optional(nameFilter != null, (q) => q.nameContains(nameFilter!, caseSensitive: false))
         .optional(
           relatedTo != null,
@@ -1484,7 +1502,7 @@ class DownloadsService {
         .optional(nameFilter != null, (q) => q.nameContains(nameFilter!, caseSensitive: false))
         .optional(
           includeItemTypes.isNotEmpty,
-          (q) => q.anyOf(includeItemTypes, (q, type) => q.baseItemTypeEqualTo(type)),
+          (q) => q.anyOf<BaseItemDtoType, dynamic>(includeItemTypes, (q, type) => q.baseItemTypeEqualTo(type)),
         )
         // If allPlaylists is info downloaded, we may have info for empty
         // playlists.  We should only return playlists with at least 1 required
@@ -1518,10 +1536,10 @@ class DownloadsService {
                 .not()
                 .stateEqualTo(DownloadItemState.notDownloaded)
                 .or()
-                .anyOf(libraryFilteredIds, (q, v) => q.isarIdEqualTo(v)),
+                .anyOf<int, dynamic>(libraryFilteredIds, (q, v) => q.isarIdEqualTo(v)),
           ),
         )
-        .optional(onlyFavorites, (q) => q.anyOf(favoriteIds, (q, v) => q.isarIdEqualTo(v)))
+        .optional(onlyFavorites, (q) => q.anyOf<int, dynamic>(favoriteIds, (q, v) => q.isarIdEqualTo(v)))
         .optional(
           viewFilter != null,
           (q) => q.group(

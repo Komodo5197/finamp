@@ -222,7 +222,7 @@ final class FinampThemeFromImageProvider
 }
 
 String _$finampThemeFromImageHash() =>
-    r'473099b6a288c9c6a7c33727eabc654de4e5c034';
+    r'2df81a892f2a2da45e6e351def4fe2102c0ef8df';
 
 final class FinampThemeFromImageFamily extends $Family
     with

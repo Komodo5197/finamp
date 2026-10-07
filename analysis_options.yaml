@@ -10,6 +10,8 @@ analyzer:
   plugins:
     - riverpod_lint: 3.1.9
   exclude:
+    - "lib/**/*.g.dart"
+    - "lib/l10n/app_localizations*.dart"
     - lib/**.chopper.dart
     - lib/color_schemes.g.dart
     - build/**

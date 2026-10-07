@@ -122,7 +122,7 @@ Future<void> showRadioMenu(
       )
       .toList();
 
-  await showThemedBottomSheet(
+  await showThemedBottomSheet<void>(
     context: context,
     item: seedItem ?? queueService.getCurrentTrack()?.baseItem,
     routeName: "/radio-menu",
