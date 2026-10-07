@@ -54,7 +54,7 @@ dependencies:
   smtc_windows:
     git:
       url: https://github.com/Komodo5197/frb_plugins.git
-      ref: 0b8d918172fb478157bf4d4d7648a21720a42a0d
+      ref: a94fbef383e973c50e47dcbd9f5e08baf2360aef
       path: packages/smtc_windows/
 
   audio_service: ^0.18.18
@@ -151,7 +151,7 @@ dependencies:
   flutter_discord_rpc:
     git:
       url: https://github.com/Komodo5197/frb_plugins.git
-      ref: 0b8d918172fb478157bf4d4d7648a21720a42a0d
+      ref: a94fbef383e973c50e47dcbd9f5e08baf2360aef
       path: packages/flutter_discord_rpc/
   shared_preferences: ^2.5.3
   flex_color_picker: ^4.0.0
