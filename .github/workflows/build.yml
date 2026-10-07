@@ -268,15 +268,13 @@ jobs:
         path: isar
         repository: Komodo5197/isar-community
         ref: 976ca6e0bfd4719aad125757fc0ac607748679b9
-    
+
+    # We used to have wildcards to handle multiple isar_community_flutter_libs versions (flutter_libs-*), but now
+    # that don't seem to work?  I've been forced to hardwire version 3.3.2
     - name: Build isar core and inject into cached isar_flutter_libs (arm64)
       if: matrix.arch == 'arm64'
       run: |
         sh tool/build_linux.sh aarch64
-        ls /
-        ls $PUB_CACHE/hosted/pub.dev/
-        ls $PUB_CACHE/hosted/pub.dev/isar_community_flutter_libs-3.3.2/
-        ls $PUB_CACHE/hosted/pub.dev/isar_community_flutter_libs-*/
         mv libisar_linux_arm64.so $PUB_CACHE/hosted/pub.dev/isar_community_flutter_libs-3.3.2/linux/libisar.aarch64.so
       working-directory: isar
 

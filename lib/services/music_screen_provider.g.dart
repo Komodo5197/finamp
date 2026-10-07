@@ -16,15 +16,15 @@ part of 'music_screen_provider.dart';
 @ProviderFor(PagedContent)
 final pagedContentProvider = PagedContentFamily._();
 
-final class PagedContentProvider
+final class PagedContentProvider<ChildType extends FinampDisplayableOrPlayable>
     extends
         $NotifierProvider<
-          PagedContent,
-          PagingState<int, FinampDisplayableOrPlayable>
+          PagedContent<ChildType>,
+          PagingState<int, ChildType>
         > {
   PagedContentProvider._({
     required PagedContentFamily super.from,
-    required FinampDisplayable<FinampDisplayableOrPlayable> super.argument,
+    required FinampDisplayable<ChildType> super.argument,
   }) : super(
          retry: null,
          name: r'pagedContentProvider',
@@ -39,49 +39,44 @@ final class PagedContentProvider
   @override
   String toString() {
     return r'pagedContentProvider'
-        ''
+        '<${ChildType}>'
         '($argument)';
   }
 
   @$internal
   @override
-  PagedContent create() => PagedContent();
+  PagedContent<ChildType> create() => PagedContent<ChildType>();
+
+  $R _captureGenerics<$R>(
+    $R Function<ChildType extends FinampDisplayableOrPlayable>() cb,
+  ) {
+    return cb<ChildType>();
+  }
 
   /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(
-    PagingState<int, FinampDisplayableOrPlayable> value,
-  ) {
+  Override overrideWithValue(PagingState<int, ChildType> value) {
     return $ProviderOverride(
       origin: this,
-      providerOverride:
-          $SyncValueProvider<PagingState<int, FinampDisplayableOrPlayable>>(
-            value,
-          ),
+      providerOverride: $SyncValueProvider<PagingState<int, ChildType>>(value),
     );
   }
 
   @override
   bool operator ==(Object other) {
-    return other is PagedContentProvider && other.argument == argument;
+    return other is PagedContentProvider &&
+        other.runtimeType == runtimeType &&
+        other.argument == argument;
   }
 
   @override
   int get hashCode {
-    return argument.hashCode;
+    return Object.hash(runtimeType, argument);
   }
 }
 
-String _$pagedContentHash() => r'1eaefb681245bb519b05fa4c4186d5a85d7a4fbe';
+String _$pagedContentHash() => r'd7ad89dc3b1af76891de2ebc26ddc518c44a7e65';
 
-final class PagedContentFamily extends $Family
-    with
-        $ClassFamilyOverride<
-          PagedContent,
-          PagingState<int, FinampDisplayableOrPlayable>,
-          PagingState<int, FinampDisplayableOrPlayable>,
-          PagingState<int, FinampDisplayableOrPlayable>,
-          FinampDisplayable<FinampDisplayableOrPlayable>
-        > {
+final class PagedContentFamily extends $Family {
   PagedContentFamily._()
     : super(
         retry: null,
@@ -91,40 +86,76 @@ final class PagedContentFamily extends $Family
         isAutoDispose: true,
       );
 
-  PagedContentProvider call(
-    FinampDisplayable<FinampDisplayableOrPlayable> request,
-  ) => PagedContentProvider._(argument: request, from: this);
+  PagedContentProvider<ChildType>
+  call<ChildType extends FinampDisplayableOrPlayable>(
+    FinampDisplayable<ChildType> request,
+  ) => PagedContentProvider<ChildType>._(argument: request, from: this);
 
   @override
   String toString() => r'pagedContentProvider';
+
+  /// {@macro riverpod.override_with}
+  Override overrideWith(
+    PagedContent<ChildType>
+    Function<ChildType extends FinampDisplayableOrPlayable>()
+    create,
+  ) => $FamilyOverride(
+    from: this,
+    createElement: (pointer) {
+      final provider = pointer.origin as PagedContentProvider;
+      return provider._captureGenerics(
+        <ChildType extends FinampDisplayableOrPlayable>() {
+          provider as PagedContentProvider<ChildType>;
+          return provider
+              .$view(create: create<ChildType>)
+              .$createElement(pointer);
+        },
+      );
+    },
+  );
+
+  /// {@macro riverpod.override_with_build}
+  Override overrideWithBuild(
+    PagingState<int, ChildType> Function<
+      ChildType extends FinampDisplayableOrPlayable
+    >(Ref ref, PagedContent<ChildType> notifier)
+    build,
+  ) => $FamilyOverride(
+    from: this,
+    createElement: (pointer) {
+      final provider = pointer.origin as PagedContentProvider;
+      return provider._captureGenerics(
+        <ChildType extends FinampDisplayableOrPlayable>() {
+          provider as PagedContentProvider<ChildType>;
+          return provider
+              .$view(runNotifierBuildOverride: build<ChildType>)
+              .$createElement(pointer);
+        },
+      );
+    },
+  );
 }
 
-abstract class _$PagedContent
-    extends $Notifier<PagingState<int, FinampDisplayableOrPlayable>> {
-  late final _$args =
-      ref.$arg as FinampDisplayable<FinampDisplayableOrPlayable>;
-  FinampDisplayable<FinampDisplayableOrPlayable> get request => _$args;
+abstract class _$PagedContent<ChildType extends FinampDisplayableOrPlayable>
+    extends $Notifier<PagingState<int, ChildType>> {
+  late final _$args = ref.$arg as FinampDisplayable<ChildType>;
+  FinampDisplayable<ChildType> get request => _$args;
 
-  PagingState<int, FinampDisplayableOrPlayable> build(
-    FinampDisplayable<FinampDisplayableOrPlayable> request,
-  );
+  PagingState<int, ChildType> build(FinampDisplayable<ChildType> request);
   @$mustCallSuper
   @override
   WhenComplete runBuild() {
     final ref =
         this.ref
-            as $Ref<
-              PagingState<int, FinampDisplayableOrPlayable>,
-              PagingState<int, FinampDisplayableOrPlayable>
-            >;
+            as $Ref<PagingState<int, ChildType>, PagingState<int, ChildType>>;
     final element =
         ref.element
             as $ClassProviderElement<
               AnyNotifier<
-                PagingState<int, FinampDisplayableOrPlayable>,
-                PagingState<int, FinampDisplayableOrPlayable>
+                PagingState<int, ChildType>,
+                PagingState<int, ChildType>
               >,
-              PagingState<int, FinampDisplayableOrPlayable>,
+              PagingState<int, ChildType>,
               Object?,
               Object?
             >;

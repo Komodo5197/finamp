@@ -1,8 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:audio_service/audio_service.dart';
 import 'package:finamp/components/MusicScreen/sort_and_filter_row.dart';
 import 'package:finamp/components/global_snackbar.dart';
+import 'package:finamp/models/finamp_models.dart';
+import 'package:finamp/models/jellyfin_models.dart';
 import 'package:finamp/models/music_models.dart';
 import 'package:finamp/services/album_image_provider.dart';
 import 'package:finamp/services/music_player_background_task.dart';
@@ -10,19 +13,16 @@ import 'package:finamp/services/music_providers.dart';
 import 'package:finamp/services/music_screen_provider.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_carplay/flutter_carplay.dart';
-import 'package:infinite_scroll_pagination/infinite_scroll_pagination.dart';
-import 'package:audio_service/audio_service.dart';
-import 'package:finamp/models/finamp_models.dart';
-import 'package:finamp/models/jellyfin_models.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:get_it/get_it.dart';
+import 'package:infinite_scroll_pagination/infinite_scroll_pagination.dart';
 import 'package:logging/logging.dart';
 
+import 'audio_service_helper.dart';
 import 'finamp_settings_helper.dart';
 import 'finamp_user_helper.dart';
-import 'audio_service_helper.dart';
-import 'queue_service.dart';
 import 'item_helper.dart';
+import 'queue_service.dart';
 
 final _carPlayLogger = Logger("CarPlay");
 
@@ -683,7 +683,7 @@ class CarPlayHelper {
         library: currentLibraryPlaceholder,
       );
       final artistAlbumsList = (await providerRef.read(getChildrenProvider(item: artist).future))
-          .map((x) => (x as FinampPlayableDto).item)
+          .map((x) => x.item)
           .toList();
       _carPlayLogger.fine("Got ${artistAlbumsList.length} albums");
 

@@ -245,7 +245,7 @@ final class GetPlayableSliceProvider
   }
 }
 
-String _$getPlayableSliceHash() => r'a7de6c8ea850e99401cdae69950743ea398e1370';
+String _$getPlayableSliceHash() => r'7893ea90340c167d8010fccf13073050ebcaec5c';
 
 final class GetPlayableSliceFamily extends $Family
     with
@@ -353,186 +353,20 @@ final class GetAlbumShuffledPlayerSliceFamily extends $Family
   String toString() => r'getAlbumShuffledPlayerSliceProvider';
 }
 
-@ProviderFor(getChildTracks)
-final getChildTracksProvider = GetChildTracksFamily._();
-
-final class GetChildTracksProvider
-    extends
-        $FunctionalProvider<
-          AsyncValue<List<Track>>,
-          List<Track>,
-          FutureOr<List<Track>>
-        >
-    with $FutureModifier<List<Track>>, $FutureProvider<List<Track>> {
-  GetChildTracksProvider._({
-    required GetChildTracksFamily super.from,
-    required FinampUnpagedDisplayable<Track> super.argument,
-  }) : super(
-         retry: null,
-         name: r'getChildTracksProvider',
-         isAutoDispose: true,
-         dependencies: null,
-         $allTransitiveDependencies: null,
-       );
-
-  @override
-  String debugGetCreateSourceHash() => _$getChildTracksHash();
-
-  @override
-  String toString() {
-    return r'getChildTracksProvider'
-        ''
-        '($argument)';
-  }
-
-  @$internal
-  @override
-  $FutureProviderElement<List<Track>> $createElement(
-    $ProviderPointer pointer,
-  ) => $FutureProviderElement(pointer);
-
-  @override
-  FutureOr<List<Track>> create(Ref ref) {
-    final argument = this.argument as FinampUnpagedDisplayable<Track>;
-    return getChildTracks(ref, item: argument);
-  }
-
-  @override
-  bool operator ==(Object other) {
-    return other is GetChildTracksProvider && other.argument == argument;
-  }
-
-  @override
-  int get hashCode {
-    return argument.hashCode;
-  }
-}
-
-String _$getChildTracksHash() => r'c94b4121e0f39fa565716273b35e6ef8f6ebbbe2';
-
-final class GetChildTracksFamily extends $Family
-    with
-        $FunctionalFamilyOverride<
-          FutureOr<List<Track>>,
-          FinampUnpagedDisplayable<Track>
-        > {
-  GetChildTracksFamily._()
-    : super(
-        retry: null,
-        name: r'getChildTracksProvider',
-        dependencies: null,
-        $allTransitiveDependencies: null,
-        isAutoDispose: true,
-      );
-
-  GetChildTracksProvider call({
-    required FinampUnpagedDisplayable<Track> item,
-  }) => GetChildTracksProvider._(argument: item, from: this);
-
-  @override
-  String toString() => r'getChildTracksProvider';
-}
-
-@ProviderFor(getChildItems)
-final getChildItemsProvider = GetChildItemsFamily._();
-
-final class GetChildItemsProvider
-    extends
-        $FunctionalProvider<
-          AsyncValue<List<FinampPlayableDto>>,
-          List<FinampPlayableDto>,
-          FutureOr<List<FinampPlayableDto>>
-        >
-    with
-        $FutureModifier<List<FinampPlayableDto>>,
-        $FutureProvider<List<FinampPlayableDto>> {
-  GetChildItemsProvider._({
-    required GetChildItemsFamily super.from,
-    required FinampUnpagedDisplayable<FinampPlayableDto> super.argument,
-  }) : super(
-         retry: null,
-         name: r'getChildItemsProvider',
-         isAutoDispose: true,
-         dependencies: null,
-         $allTransitiveDependencies: null,
-       );
-
-  @override
-  String debugGetCreateSourceHash() => _$getChildItemsHash();
-
-  @override
-  String toString() {
-    return r'getChildItemsProvider'
-        ''
-        '($argument)';
-  }
-
-  @$internal
-  @override
-  $FutureProviderElement<List<FinampPlayableDto>> $createElement(
-    $ProviderPointer pointer,
-  ) => $FutureProviderElement(pointer);
-
-  @override
-  FutureOr<List<FinampPlayableDto>> create(Ref ref) {
-    final argument =
-        this.argument as FinampUnpagedDisplayable<FinampPlayableDto>;
-    return getChildItems(ref, item: argument);
-  }
-
-  @override
-  bool operator ==(Object other) {
-    return other is GetChildItemsProvider && other.argument == argument;
-  }
-
-  @override
-  int get hashCode {
-    return argument.hashCode;
-  }
-}
-
-String _$getChildItemsHash() => r'9bb5a70df1d6eeb9407ba0e44729af2cce2a0dd2';
-
-final class GetChildItemsFamily extends $Family
-    with
-        $FunctionalFamilyOverride<
-          FutureOr<List<FinampPlayableDto>>,
-          FinampUnpagedDisplayable<FinampPlayableDto>
-        > {
-  GetChildItemsFamily._()
-    : super(
-        retry: null,
-        name: r'getChildItemsProvider',
-        dependencies: null,
-        $allTransitiveDependencies: null,
-        isAutoDispose: true,
-      );
-
-  GetChildItemsProvider call({
-    required FinampUnpagedDisplayable<FinampPlayableDto> item,
-  }) => GetChildItemsProvider._(argument: item, from: this);
-
-  @override
-  String toString() => r'getChildItemsProvider';
-}
-
 @ProviderFor(getChildren)
 final getChildrenProvider = GetChildrenFamily._();
 
-final class GetChildrenProvider
+final class GetChildrenProvider<ChildType extends FinampDisplayableOrPlayable>
     extends
         $FunctionalProvider<
-          AsyncValue<List<FinampDisplayableOrPlayable>>,
-          List<FinampDisplayableOrPlayable>,
-          FutureOr<List<FinampDisplayableOrPlayable>>
+          AsyncValue<List<ChildType>>,
+          List<ChildType>,
+          FutureOr<List<ChildType>>
         >
-    with
-        $FutureModifier<List<FinampDisplayableOrPlayable>>,
-        $FutureProvider<List<FinampDisplayableOrPlayable>> {
+    with $FutureModifier<List<ChildType>>, $FutureProvider<List<ChildType>> {
   GetChildrenProvider._({
     required GetChildrenFamily super.from,
-    required FinampUnpagedDisplayable<FinampDisplayableOrPlayable>
-    super.argument,
+    required FinampUnpagedDisplayable<ChildType> super.argument,
   }) : super(
          retry: null,
          name: r'getChildrenProvider',
@@ -547,42 +381,44 @@ final class GetChildrenProvider
   @override
   String toString() {
     return r'getChildrenProvider'
-        ''
+        '<${ChildType}>'
         '($argument)';
   }
 
   @$internal
   @override
-  $FutureProviderElement<List<FinampDisplayableOrPlayable>> $createElement(
+  $FutureProviderElement<List<ChildType>> $createElement(
     $ProviderPointer pointer,
   ) => $FutureProviderElement(pointer);
 
   @override
-  FutureOr<List<FinampDisplayableOrPlayable>> create(Ref ref) {
-    final argument =
-        this.argument as FinampUnpagedDisplayable<FinampDisplayableOrPlayable>;
-    return getChildren(ref, item: argument);
+  FutureOr<List<ChildType>> create(Ref ref) {
+    final argument = this.argument as FinampUnpagedDisplayable<ChildType>;
+    return getChildren<ChildType>(ref, item: argument);
+  }
+
+  $R _captureGenerics<$R>(
+    $R Function<ChildType extends FinampDisplayableOrPlayable>() cb,
+  ) {
+    return cb<ChildType>();
   }
 
   @override
   bool operator ==(Object other) {
-    return other is GetChildrenProvider && other.argument == argument;
+    return other is GetChildrenProvider &&
+        other.runtimeType == runtimeType &&
+        other.argument == argument;
   }
 
   @override
   int get hashCode {
-    return argument.hashCode;
+    return Object.hash(runtimeType, argument);
   }
 }
 
-String _$getChildrenHash() => r'd2ea3dcb7eda184998a67d1f5ba49780a08c72b1';
+String _$getChildrenHash() => r'df74037f96fe1dced93fb2e1cac431999c955aaa';
 
-final class GetChildrenFamily extends $Family
-    with
-        $FunctionalFamilyOverride<
-          FutureOr<List<FinampDisplayableOrPlayable>>,
-          FinampUnpagedDisplayable<FinampDisplayableOrPlayable>
-        > {
+final class GetChildrenFamily extends $Family {
   GetChildrenFamily._()
     : super(
         retry: null,
@@ -592,10 +428,34 @@ final class GetChildrenFamily extends $Family
         isAutoDispose: true,
       );
 
-  GetChildrenProvider call({
-    required FinampUnpagedDisplayable<FinampDisplayableOrPlayable> item,
-  }) => GetChildrenProvider._(argument: item, from: this);
+  GetChildrenProvider<ChildType>
+  call<ChildType extends FinampDisplayableOrPlayable>({
+    required FinampUnpagedDisplayable<ChildType> item,
+  }) => GetChildrenProvider<ChildType>._(argument: item, from: this);
 
   @override
   String toString() => r'getChildrenProvider';
+
+  /// {@macro riverpod.override_with}
+  Override overrideWith(
+    FutureOr<List<ChildType>> Function<
+      ChildType extends FinampDisplayableOrPlayable
+    >(Ref ref, FinampUnpagedDisplayable<ChildType> args)
+    create,
+  ) => $FamilyOverride(
+    from: this,
+    createElement: (pointer) {
+      final provider = pointer.origin as GetChildrenProvider;
+      return provider._captureGenerics(
+        <ChildType extends FinampDisplayableOrPlayable>() {
+          provider as GetChildrenProvider<ChildType>;
+          final argument =
+              provider.argument as FinampUnpagedDisplayable<ChildType>;
+          return provider
+              .$view(create: (ref) => create(ref, argument))
+              .$createElement(pointer);
+        },
+      );
+    },
+  );
 }
