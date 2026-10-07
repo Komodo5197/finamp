@@ -179,15 +179,17 @@ dev_dependencies:
   msix: ^3.16.9
 
 dependency_overrides:
+  # Fork adds Linux arm compatibility
   isar_community:
     git:
       url: https://github.com/Komodo5197/isar-community.git
       ref: v3-linux-arm
       path: packages/isar_community
+  # fork widens analyzer range and fixes name annotation on getter
   isar_community_generator:
       git:
-        url: https://github.com/reedom/isar-community.git
-        ref: feat/analyzer-14
+        url: https://github.com/Komodo5197/isar-community.git
+        ref: v3-finamp-ce
         path: packages/isar_community_generator
 
 # For information on the generic Dart part of this file, see the

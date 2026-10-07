@@ -942,9 +942,9 @@ packages:
     dependency: "direct dev"
     description:
       path: "packages/isar_community_generator"
-      ref: "feat/analyzer-14"
-      resolved-ref: "48464e5e229ede730efc3f6079067b1f092fe3b0"
-      url: "https://github.com/reedom/isar-community.git"
+      ref: v3-finamp-ce
+      resolved-ref: "887a44977a9dc5484925bb37b31dd8478372743c"
+      url: "https://github.com/Komodo5197/isar-community.git"
     source: git
     version: "3.3.2"
   isolate_channel:

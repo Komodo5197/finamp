@@ -56,22 +56,27 @@ class FinampUser {
 
   // @HiveField(1)
   // String baseUrl;
+
   @HiveField(1)
   @Name("baseUrl")
   String publicAddress;
 
+  @ignore
   String get baseURL => isLocal && preferLocalNetwork ? localAddress : publicAddress;
 
   @HiveField(2)
   String accessToken;
   @HiveField(3)
   String serverId;
+
   @HiveField(4)
   @ignore
   BaseItemId? currentViewId;
+
   @Name("currentViewId")
   String? get isarCurrentViewId => currentViewId?.raw;
   set isarCurrentViewId(String? id) => currentViewId = id == null ? null : BaseItemId(id);
+
   @ignore
   @HiveField(5)
   Map<BaseItemId, BaseItemDto> views;

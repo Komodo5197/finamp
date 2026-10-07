@@ -245,7 +245,7 @@ final class GetPlayableSliceProvider
   }
 }
 
-String _$getPlayableSliceHash() => r'7893ea90340c167d8010fccf13073050ebcaec5c';
+String _$getPlayableSliceHash() => r'1c96ded656b217312f56f343cd38e5556e50d876';
 
 final class GetPlayableSliceFamily extends $Family
     with
