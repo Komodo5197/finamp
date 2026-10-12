@@ -638,7 +638,7 @@ class JellyfinInterceptor implements Interceptor {
       baseUrlTemp = jellyfinApiHelper.baseUrlTemp;
     }
 
-    String authHeader = finampUserHelper.authorizationHeader;
+    final authHeaders = finampUserHelper.authorizationHeaders;
 
     // If baseUrlTemp is null, use the baseUrl of the current user.
     // If baseUrlTemp is set, we're setting up a new user and should use it instead.
@@ -651,7 +651,7 @@ class JellyfinInterceptor implements Interceptor {
     // Do NOT force a Content-Type here; let Chopper/converters set JSON, and leave
     // multipart or raw uploads (e.g., image POST) untouched so the server
     // receives the correct boundary or image media type.
-    return request.copyWith(uri: baseUri, headers: {...request.headers, "Authorization": authHeader});
+    return request.copyWith(uri: baseUri, headers: {...request.headers, ...authHeaders});
   }
 }
 
@@ -672,10 +672,7 @@ class JellyfinSpecificInterceptor implements Interceptor {
     Uri baseUri = Uri.parse(url);
     baseUri = baseUri.replace(pathSegments: baseUri.pathSegments.followedBy(request.uri.pathSegments));
 
-    return request.copyWith(
-      uri: baseUri,
-      headers: {...request.headers, "Authorization": finampUserHelper.authorizationHeader},
-    );
+    return request.copyWith(uri: baseUri, headers: {...request.headers, ...finampUserHelper.authorizationHeaders});
   }
 }
 

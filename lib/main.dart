@@ -121,7 +121,7 @@ late DateTime startTime;
 
 final providerScopeKey = GlobalKey();
 
-Future<void> main(List<String> args, {bool integrationTesting = false, bool loginTesting = false}) async {
+Future<void> main(List<String> args, {bool integrationTesting = false, bool loginTesting = true}) async {
   if (loginTesting) {
     // Note that download baseDirectories cannot be redirected, so use of this flag
     // causes errors in downloader on mobile platforms
