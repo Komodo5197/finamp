@@ -25,12 +25,18 @@ class FinampUserHelper {
   }
 
   Future<void> setAuthHeader() async {
+    authorizationHeaders = await buildHeaders(currentUser?.customHeaders ?? <String, String>{});
+  }
+
+  static const httpAuthorizationHeader = "Jelly-Auth";
+
+  Future<Map<String, String>> buildHeaders(Map<String, String> customHeaders) async {
     final jellyfinAuth = await jellyfin_api.getAuthHeader(deviceId: deviceId);
-    final headers = Map.of(currentUser?.customHeaders ?? <String, String>{});
+    final headers = Map.of(customHeaders);
     // TODO remove testing headers
-    headers["Jelly-Auth"] = jellyfinAuth;
-    headers["Authorization"] = "Basic dGVzdDp0ZXN0";
-    authorizationHeaders = headers;
+    headers[httpAuthorizationHeader] = jellyfinAuth;
+    //headers["Authorization"] = "Basic dGVzdDp0ZXN0";
+    return headers;
   }
 
   final _isar = GetIt.instance<Isar>();

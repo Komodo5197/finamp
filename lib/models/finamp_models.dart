@@ -95,7 +95,7 @@ class FinampUser {
     final out = <String, String>{};
     final midPoint = (raw.length / 2).round();
     for (int i = 0; i < midPoint; i++) {
-      out[raw[i] = raw[midPoint + i]];
+      out[raw[i]] = raw[midPoint + i];
     }
     customHeaders = out;
   }

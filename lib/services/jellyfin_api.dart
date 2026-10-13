@@ -633,12 +633,18 @@ class JellyfinInterceptor implements Interceptor {
   Request updateRequest(Request request) {
     final finampUserHelper = GetIt.instance<FinampUserHelper>();
     Uri? baseUrlTemp;
+    Map<String, String>? overrideHeaders;
     if (inForeground) {
       final jellyfinApiHelper = GetIt.instance<JellyfinApiHelper>();
       baseUrlTemp = jellyfinApiHelper.baseUrlTemp;
+      final customHeadersTemp = jellyfinApiHelper.customHeadersTemp;
+      if (customHeadersTemp != null) {
+        overrideHeaders = Map.of(customHeadersTemp);
+        overrideHeaders.addAll(finampUserHelper.authorizationHeaders);
+      }
     }
 
-    final authHeaders = finampUserHelper.authorizationHeaders;
+    final authHeaders = overrideHeaders ?? finampUserHelper.authorizationHeaders;
 
     // If baseUrlTemp is null, use the baseUrl of the current user.
     // If baseUrlTemp is set, we're setting up a new user and should use it instead.

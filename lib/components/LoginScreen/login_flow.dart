@@ -91,6 +91,7 @@ class _LoginFlowState extends State<LoginFlow> {
             case LoginServerSelectionPage.routeName:
               route = createRoute(
                 LoginServerSelectionPage(
+                  key: loginServerSelectionKey,
                   serverState: serverState,
                   onServerSelected: (PublicSystemInfoResult server, String baseUrl) {
                     serverState.selectedServer = server;
@@ -232,6 +233,7 @@ class ServerState {
 
   Future<void> testServerConnection(String baseUrl) async {
     if (baseUrl.isNotEmpty) {
+      print("wassup!");
       bool unspecifiedProtocol = false;
       bool unspecifiedPort = false;
 
