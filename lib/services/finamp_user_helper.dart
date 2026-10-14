@@ -28,14 +28,12 @@ class FinampUserHelper {
     authorizationHeaders = await buildHeaders(currentUser?.customHeaders ?? <String, String>{});
   }
 
-  static const httpAuthorizationHeader = "Jelly-Auth";
+  static const httpAuthorizationHeader = "Authorization";
 
   Future<Map<String, String>> buildHeaders(Map<String, String> customHeaders) async {
     final jellyfinAuth = await jellyfin_api.getAuthHeader(deviceId: deviceId);
     final headers = Map.of(customHeaders);
-    // TODO remove testing headers
     headers[httpAuthorizationHeader] = jellyfinAuth;
-    //headers["Authorization"] = "Basic dGVzdDp0ZXN0";
     return headers;
   }
 

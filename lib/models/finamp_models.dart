@@ -1000,6 +1000,7 @@ class FinampSettings {
       gridImageSize: DefaultSettings.gridImageSize,
       homeScreenImageSize: DefaultSettings.homeScreenImageSize,
       deviceId: const Uuid().v4(),
+      resyncOnStartup: kDebugMode ? false : DefaultSettings.resyncOnStartup,
     );
   }
 

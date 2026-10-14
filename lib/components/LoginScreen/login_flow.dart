@@ -231,9 +231,8 @@ class ServerState {
     });
   }
 
-  Future<void> testServerConnection(String baseUrl) async {
+  Future<void> testServerConnection(String baseUrl, {bool isNavidromeRetry = false}) async {
     if (baseUrl.isNotEmpty) {
-      print("wassup!");
       bool unspecifiedProtocol = false;
       bool unspecifiedPort = false;
 
@@ -256,6 +255,10 @@ class ServerState {
 
       if (baseUrlToTest.endsWith("/")) {
         baseUrlToTest = baseUrlToTest.substring(0, baseUrlToTest.length - 1);
+      }
+
+      if (isNavidromeRetry) {
+        baseUrlToTest = "$baseUrlToTest/jellyfin";
       }
 
       jellyfinApiHelper.baseUrlTemp = Uri.parse(baseUrlToTest);
@@ -293,7 +296,7 @@ class ServerState {
 
       if (publicServerInfo == null && unspecifiedPort) {
         // try default port 8096
-        Uri url = Uri.parse(baseUrlToTest).replace(port: 8096);
+        Uri url = Uri.parse(baseUrlToTest).replace(port: isNavidromeRetry ? 4533 : 8096);
         baseUrlToTest = url.toString(); // update the local url
         jellyfinApiHelper.baseUrlTemp = url;
         try {
@@ -309,6 +312,8 @@ class ServerState {
       if (publicServerInfo != null) {
         manualServer = publicServerInfo;
         this.baseUrl = baseUrlToTest;
+      } else if (!isNavidromeRetry) {
+        return testServerConnection(baseUrl, isNavidromeRetry: true);
       }
     }
   }
