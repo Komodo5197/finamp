@@ -333,6 +333,7 @@ class DefaultSettings {
   static const useAndroidGainEffect = true;
   static const ClientCertificate? clientCertificate = null;
   static const showQuickActionsBanner = true;
+  static const followRedirects = false;
 }
 
 @HiveType(typeId: 28)
@@ -481,6 +482,7 @@ class FinampSettings {
     this.clientCertificate = DefaultSettings.clientCertificate,
     this.showQuickActionsBanner = DefaultSettings.showQuickActionsBanner,
     this.perTabContentViewType = DefaultSettings.perTabContentViewType,
+    this.followRedirects = DefaultSettings.followRedirects,
   });
 
   @HiveField(0, defaultValue: DefaultSettings.isOffline)
@@ -984,6 +986,9 @@ class FinampSettings {
   @HiveField(160, defaultValue: DefaultSettings.perTabContentViewType)
   @SettingsHelperMap("tabContentType")
   Map<ContentType, ContentViewType> perTabContentViewType;
+
+  @HiveField(161, defaultValue: DefaultSettings.followRedirects)
+  bool followRedirects;
 
   static Future<FinampSettings> create() async {
     final downloadLocation = await DownloadLocation.create(

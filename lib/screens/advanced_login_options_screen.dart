@@ -37,6 +37,7 @@ class AdvancedLoginOptionsScreen extends ConsumerWidget {
         body: ListView(
           padding: const EdgeInsets.only(bottom: 200.0),
           children: [
+            ListTile(title: Text(context.l10n.advancedLoginOptionsWarning)),
             ListTile(
               leading: Icon(TablerIcons.certificate),
               title: Text(AppLocalizations.of(context)!.clientCertificate),
@@ -55,6 +56,7 @@ class AdvancedLoginOptionsScreen extends ConsumerWidget {
               title: Text(AppLocalizations.of(context)!.customHeaders),
               onTap: () => showCustomHeadersMenu(context: context),
             ),
+            const FollowRedirectsSwitch(),
             ListTile(
               leading: const Icon(TablerIcons.accessible),
               title: Text(AppLocalizations.of(context)!.accessibility),
@@ -68,6 +70,20 @@ class AdvancedLoginOptionsScreen extends ConsumerWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class FollowRedirectsSwitch extends ConsumerWidget {
+  const FollowRedirectsSwitch({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return SwitchListTile.adaptive(
+      title: Text(AppLocalizations.of(context)!.followRedirectsTitle),
+      subtitle: Text(AppLocalizations.of(context)!.followRedirectsSubtitle),
+      value: ref.watch(finampSettingsProvider.followRedirects),
+      onChanged: FinampSetters.setFollowRedirects,
     );
   }
 }
