@@ -36,7 +36,7 @@ dependencies:
     # Also need exoplayer updated to 1.11.0
     git:
       url: https://github.com/Komodo5197/just_audio.git
-      ref: minor-exoplayer-1.11
+      ref: 10f7a32c85cc07e6669a18263aaf8d1153b2ba31
       path: just_audio
   just_audio_media_kit:
     git:
