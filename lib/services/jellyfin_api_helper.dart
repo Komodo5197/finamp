@@ -31,15 +31,15 @@ import 'jellyfin_api.dart' as jellyfin_api;
 
 class JellyfinApiHelper {
   JellyfinApiHelper()
-    : jellyfinApi = _createApi(inForeground: true, verboseLogging: FinampSettingsHelper.finampSettings.verboseLogging) {
+    : jellyfinApi = jellyfin_api.JellyfinApi.create(
+        inForeground: true,
+        verboseLogging: FinampSettingsHelper.finampSettings.verboseLogging,
+      ) {
     _startBackgroundWorker();
   }
 
-  /// The API client owns the HTTP connection pool.  It must be replaceable:
-  /// Android can retain sockets and DNS answers after Wi-Fi/mobile hand-offs.
-  jellyfin_api.JellyfinApi jellyfinApi;
+  final jellyfin_api.JellyfinApi jellyfinApi;
   static final _jellyfinApiHelperLogger = Logger("JellyfinApiHelper");
-  static const _resetNetworkClientMessage = "finamp.resetNetworkClient";
 
   // Stores the ids of the artists that the user selected to mix
   List<BaseItemDto> selectedMixArtists = [];
@@ -132,65 +132,51 @@ class JellyfinApiHelper {
     GetIt.instance.registerSingleton(isar);
     GetIt.instance.registerSingleton(FinampUserHelper(deviceId: input.$4));
     await GetIt.instance<FinampUserHelper>().setAuthHeader();
-    jellyfin_api.JellyfinApi backgroundApi = _createApi(inForeground: false, verboseLogging: input.$6);
-    await for (var request in requestPort) {
-      if (request is (String, SendPort) && request.$1 == _resetNetworkClientMessage) {
-        try {
-          _disposeApi(backgroundApi);
-          GetIt.instance<FinampUserHelper>().refreshCurrentUser();
-          backgroundApi = _createApi(inForeground: false, verboseLogging: input.$6);
-        } finally {
-          request.$2.send(null);
-        }
-        continue;
-      }
+    final backgroundApi = jellyfin_api.JellyfinApi.create(inForeground: false, verboseLogging: input.$6);
+    requestPort.listen((request) {
       var (func, outputPort) = request as (Future<dynamic> Function(jellyfin_api.JellyfinApi), SendPort);
-      try {
-        var output = await func(backgroundApi);
-        outputPort.send(output);
-      } catch (e, stack) {
-        _jellyfinApiHelperLogger.severe("Error processing background request - $e", e, stack);
-        outputPort.send(e);
-      }
-    }
+      Future.sync(() => func(backgroundApi)).then(outputPort.send).catchError((Object error, StackTrace stack) {
+        _jellyfinApiHelperLogger.severe("Error processing background request - $error", error, stack);
+        outputPort.send(error);
+      });
+    });
   }
 
-  static jellyfin_api.JellyfinApi _createApi({required bool inForeground, required bool verboseLogging}) {
-    return jellyfin_api.JellyfinApi.create(inForeground: inForeground, verboseLogging: verboseLogging);
+  static void _replaceClient(jellyfin_api.JellyfinApi api, {required bool inForeground, required bool verboseLogging}) {
+    final oldClient = api.client;
+    api.client = jellyfin_api.JellyfinApi.createClient(inForeground: inForeground, verboseLogging: verboseLogging);
+    // Chopper deliberately does not close a custom IOClient. Closing it here
+    // terminates stale keep-alive sockets and any request on the old route.
+    oldClient.dispose();
+    oldClient.httpClient.close();
   }
 
-  static void _disposeApi(jellyfin_api.JellyfinApi api) {
-    // JellyfinApi supplies Chopper with an IOClient, so Chopper deliberately
-    // does not close it on dispose.  Close both layers to discard pooled
-    // sockets and their stale DNS route.
-    final client = api.client;
-    client.dispose();
-    client.httpClient.close();
-  }
-
-  /// Discards all HTTP keep-alive connections after Android reports a network
-  /// change.  This is intentionally independent of the configured URLs.
+  /// Replaces only the Chopper transport after a network change. The same
+  /// helper is executed in the worker isolate through [runInIsolate], so no
+  /// custom control protocol is needed there.
   Future<void> resetNetworkConnections() async {
-    _jellyfinApiHelperLogger.info("Network changed; recreating HTTP clients");
-    _disposeApi(jellyfinApi);
-    jellyfinApi = _createApi(inForeground: true, verboseLogging: FinampSettingsHelper.finampSettings.verboseLogging);
-    final workerIsolatePort = _workerIsolatePort;
-    if (workerIsolatePort == null) return;
+    _jellyfinApiHelperLogger.info("Network changed; replacing HTTP transports");
+    final verboseLogging = FinampSettingsHelper.finampSettings.verboseLogging;
+    _replaceClient(jellyfinApi, inForeground: true, verboseLogging: verboseLogging);
+    if (_workerIsolatePort == null) return;
 
-    final responsePort = ReceivePort();
     try {
-      workerIsolatePort.send((_resetNetworkClientMessage, responsePort.sendPort));
-      await responsePort.first.timeout(const Duration(seconds: 12));
-    } on TimeoutException {
-      _jellyfinApiHelperLogger.warning("Timed out resetting the background HTTP client");
-    } finally {
-      responsePort.close();
+      await runInIsolate<void>((api) async {
+        GetIt.instance<FinampUserHelper>().refreshCurrentUser();
+        _replaceClient(api, inForeground: false, verboseLogging: verboseLogging);
+      }, allowForegroundFallback: false);
+    } catch (error, stack) {
+      _jellyfinApiHelperLogger.warning("Could not replace the background HTTP transport", error, stack);
     }
   }
 
   /// Runs the given function in a background isolate, supplying a valid API instance.
-  Future<T> runInIsolate<T>(Future<T> Function(jellyfin_api.JellyfinApi) func) async {
+  Future<T> runInIsolate<T>(
+    Future<T> Function(jellyfin_api.JellyfinApi) func, {
+    bool allowForegroundFallback = true,
+  }) async {
     if (_workerIsolatePort == null) {
+      if (!allowForegroundFallback) throw StateError("Background worker is not running");
       return func(jellyfinApi);
     }
     ReceivePort port = ReceivePort();
@@ -199,21 +185,15 @@ class JellyfinApiHelper {
     } catch (e) {
       GlobalSnackbar.error(e);
       port.close();
+      if (!allowForegroundFallback) rethrow;
       return func(jellyfinApi);
     }
     try {
-      final dynamic output = await port.first.timeout(const Duration(seconds: 5));
+      final dynamic output = await port.first;
       if (output is T) {
         return output;
       }
       throw output as Object;
-    } on TimeoutException {
-      // A request started before Android removed the old transport can remain
-      // blocked in the single background worker. Do not leave Home, search or
-      // a retry spinner waiting forever: the foreground client was recreated
-      // during the hand-off and can make this request on the new route.
-      _jellyfinApiHelperLogger.warning("Background request stalled after a network change; retrying in foreground");
-      return func(jellyfinApi);
     } finally {
       port.close();
     }

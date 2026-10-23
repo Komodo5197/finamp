@@ -281,8 +281,8 @@ class PlayOnService {
   /// from being revived when the new one clears [abortConnect].
   Future<void> reconnectAfterNetworkChange() async {
     closeListener();
-    for (var attempt = 0; socketState == SocketState.connecting && attempt < 200; attempt++) {
-      await Future<void>.delayed(const Duration(milliseconds: 50));
+    for (var attempt = 0; socketState == SocketState.connecting && attempt < 4; attempt++) {
+      await Future<void>.delayed(const Duration(milliseconds: 500));
     }
     if (socketState == SocketState.connecting) {
       _playOnServiceLogger.warning("Timed out waiting to replace PlayOn connection after network change");

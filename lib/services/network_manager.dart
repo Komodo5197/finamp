@@ -1,12 +1,10 @@
 import 'dart:async';
-import 'dart:core';
 import 'dart:io';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:finamp/components/global_snackbar.dart';
 import 'package:finamp/l10n/app_localizations.dart';
 import 'package:finamp/services/downloads_service.dart';
-import 'package:finamp/services/data_source_service.dart';
 import 'package:finamp/services/finamp_user_helper.dart';
 import 'package:finamp/services/jellyfin_api_helper.dart';
 import 'package:finamp/services/playon_service.dart';
@@ -20,316 +18,180 @@ import 'finamp_settings_helper.dart';
 
 part 'network_manager.g.dart';
 
-Logger _networkAutomationLogger = Logger("Network Automation");
-Logger _autoOfflineLogger = Logger("Auto Offline");
-Logger _networKSwitcherLogger = Logger("Network Switcher");
+final _networkAutomationLogger = Logger('Network Automation');
 
-int activeDelayCounter = 0;
-Future<void> _networkChangeQueue = Future.value();
-Timer? _preferredLocalUrlRetryTimer;
-int _networkChangeGeneration = 0;
+enum FinampConnectivityState { localNetwork, cellular, none }
 
-const _preferredLocalUrlRetryDelay = Duration(seconds: 3);
+enum ServerPingType { local, remote, active }
 
-/// This stream receives update when autoOffline enters/exists the 7 second confirmation/validation timeout
-final autoOfflineStatusStream = StreamController<int>.broadcast();
-final autoOfflineStatusProvider = StreamProvider((ref) {
-  return autoOfflineStatusStream.stream;
-}).select((v) => v.valueOrNull ?? 0);
+late List<ConnectivityResult> _latestConnectivity;
+Timer? _localReachabilityRetry;
+Timer? _playOnReconnectRetry;
 
-final StreamSubscription<List<ConnectivityResult>> _listener = Connectivity().onConnectivityChanged.listen(
-  _onConnectivityChange,
-);
+const _localReachabilityRetryDelay = Duration(seconds: 3);
 
-@riverpod
-class AutoOffline extends _$AutoOffline {
-  static void startWatching() {
-    ProviderContainer container = GetIt.instance<ProviderContainer>();
+Future<void> startNetworkAutomation() async {
+  final container = GetIt.instance<ProviderContainer>();
+  _latestConnectivity = await Connectivity().checkConnectivity();
+  Connectivity().onConnectivityChanged.listen(_onConnectivityChange);
 
-    container.listen(autoOfflineProvider, (_, automationState) {
-      bool automationEnabled = automationState > 0;
-      _networkAutomationLogger.info("${automationEnabled ? "Enabled" : "Paused"} Automation");
+  container.listen(setLocalUrlProvider, (_, isLocal) {
+    if (isLocal == null) return;
+    final user = GetIt.instance<FinampUserHelper>().currentUser;
+    if (user == null || user.isLocal == isLocal) return;
 
-      if (automationEnabled) {
-        _listener.resume();
-        // instantly check if offline mode should be on
-        _onConnectivityChange(null);
-      } else {
-        _listener.pause();
-      }
-    }, fireImmediately: true);
-  }
+    _networkAutomationLogger.info('Setting active server to ${isLocal ? 'local' : 'public'}');
+    user.update(newIsLocal: isLocal);
+    _schedulePlayOnReconnect();
+  }, fireImmediately: true);
 
-  @override
-  int build() {
-    bool autoOfflineEnabled = ref.watch(finampSettingsProvider.autoOffline) != AutoOfflineOption.disabled;
+  container.listen(setOfflineModeProvider, (_, isOffline) {
+    if (isOffline == null || isOffline == FinampSettingsHelper.finampSettings.isOffline) return;
+    _networkAutomationLogger.info('Setting offline mode to $isOffline');
+    GlobalSnackbar.message(
+      (context) => AppLocalizations.of(context)!.autoOfflineNotification(isOffline ? 'enabled' : 'disabled'),
+    );
+    FinampSetters.setIsOffline(isOffline);
+  }, fireImmediately: true);
 
-    // false = user overwrote offline mode
-    bool autoOfflineActive = ref.watch(finampSettingsProvider.autoOfflineListenerActive);
+  container.listen(networkConnectivityProvider, (_, value) {
+    final state = value.value;
+    if (state == null) return;
 
-    bool preferLocalNetwork =
-        ref.watch(FinampUserHelper.finampCurrentUserProvider)?.preferLocalNetwork ?? DefaultSettings.preferLocalNetwork;
-
-    // Why this integer magic?
-    // If the function would return a bool aka. `(autoOfflineEnabled && autoOfflineActive) || autoServerSwitch`
-    // The container.listen would only trigger when the value actually changes (doesn't stay the same).
-    // This means when preferLocalNetwork is true, the method will always return `true`. Thus not firing the listener.
-    // Why does the listener need to trigger?
-    // When the user paused automation by manually changing offline mode, and then reengages automation
-    // The listener wouldn't fire (since the value doesn't actually change, it stays `true`), this results in _onConnectivityChange
-    // not being called which means autoOffline wont reevaluate the offline-state immediately, meaning offlineMode stays where the
-    // user last changed it to and wont update until a network change happens
-    int state = 0;
-    if (autoOfflineEnabled && autoOfflineActive) state += 1;
-    if (preferLocalNetwork) state += 2;
-
-    return state;
-  }
-}
-
-Future<void> _onConnectivityChange(List<ConnectivityResult>? connections) async {
-  final generation = ++_networkChangeGeneration;
-  _preferredLocalUrlRetryTimer?.cancel();
-
-  // Android commonly emits several states while moving between Wi-Fi and
-  // mobile data.  Handle them in order so an earlier reachability check cannot
-  // restore clients that a later event has just invalidated.
-  _networkChangeQueue = _networkChangeQueue.then((_) => _handleConnectivityChange(connections, generation)).catchError((
-    Object error,
-    StackTrace stack,
-  ) {
-    _networkAutomationLogger.severe("Error handling network change: $error", error, stack);
-  });
-  return _networkChangeQueue;
-}
-
-Future<void> _handleConnectivityChange(List<ConnectivityResult>? connections, int generation) async {
-  _networkAutomationLogger.info(
-    "Network Change: ${connections?.map((element) => element.toString()).join(", ") ?? "None (likely a manual function call)"}",
-  );
-  connections ??= await Connectivity().checkConnectivity();
-
-  final networkAvailable = connections.any((connection) => connection != ConnectivityResult.none);
-  if (!networkAvailable) {
-    await DataSourceService.setNetworkAvailable(false);
-  }
-
-  // A local address is only meaningful on a local transport.  In particular,
-  // after Wi-Fi is disabled Android may retain a short-lived route while the
-  // phone is already using mobile data; probing that route can incorrectly
-  // leave the LAN URL selected.  On mobile-only (or no) connectivity, select
-  // the public URL directly.  With Wi-Fi/Ethernet available, keep the normal
-  // reachability probe because it may be a Wi-Fi network away from home.
-  final hasPotentialLocalTransport =
-      connections.contains(ConnectivityResult.wifi) || connections.contains(ConnectivityResult.ethernet);
-  final sourceChanged = await changeTargetUrl(isLocal: hasPotentialLocalTransport ? null : false);
-
-  // Android may publish Wi-Fi before DHCP/routing has made the LAN reachable.
-  // The first probe then correctly keeps the public address, but there may be
-  // no second connectivity callback once the local server becomes reachable.
-  // Recheck once after that short settling period so "prefer local" is
-  // honoured when the user comes back home.
-  if (hasPotentialLocalTransport && !sourceChanged) {
-    _schedulePreferredLocalUrlRetry(generation);
-  } else {
-    _preferredLocalUrlRetryTimer?.cancel();
-  }
-
-  // Do this only after persisting the selected address.  Recreating a client
-  // is a best-effort cleanup; it must never prevent the source selection from
-  // reaching the user state.
-  await GetIt.instance<JellyfinApiHelper>().resetNetworkConnections();
-  if (networkAvailable) {
-    await DataSourceService.setNetworkAvailable(true, sourceChanged: sourceChanged);
-  }
-  final offlineModeActive = await _setOfflineMode(connections);
-  if (!offlineModeActive) await _reconnectPlayOnService(connections);
-  _notifyOfPausedDownloads(connections);
-}
-
-void _schedulePreferredLocalUrlRetry(int generation) {
-  _preferredLocalUrlRetryTimer?.cancel();
-  _preferredLocalUrlRetryTimer = Timer(_preferredLocalUrlRetryDelay, () {
-    if (generation != _networkChangeGeneration) return;
-
-    _networkChangeQueue = _networkChangeQueue.then((_) => _retryPreferredLocalUrl(generation)).catchError((
-      Object error,
-      StackTrace stack,
-    ) {
-      _networkAutomationLogger.severe("Error retrying preferred local URL: $error", error, stack);
-    });
-  });
-}
-
-Future<void> _retryPreferredLocalUrl(int generation) async {
-  if (generation != _networkChangeGeneration) return;
-
-  final connections = await Connectivity().checkConnectivity();
-  if (generation != _networkChangeGeneration) return;
-
-  final hasPotentialLocalTransport =
-      connections.contains(ConnectivityResult.wifi) || connections.contains(ConnectivityResult.ethernet);
-  final user = GetIt.instance<FinampUserHelper>().currentUser;
-
-  if (!hasPotentialLocalTransport || user == null || !user.preferLocalNetwork || user.isLocal) return;
-
-  if (!await GetIt.instance<JellyfinApiHelper>().pingLocalServer() || generation != _networkChangeGeneration) {
-    _networkAutomationLogger.fine("Preferred local server is still unreachable after network recovery");
-    return;
-  }
-
-  _networkAutomationLogger.info("Local server became reachable after network recovery; restoring local address");
-  final sourceChanged = await changeTargetUrl(isLocal: true);
-  if (!sourceChanged) return;
-
-  await GetIt.instance<JellyfinApiHelper>().resetNetworkConnections();
-  await DataSourceService.setNetworkAvailable(true, sourceChanged: true);
-  await _reconnectPlayOnService(connections);
-}
-
-bool featureEnabled() {
-  return FinampSettingsHelper.finampSettings.autoOffline != AutoOfflineOption.disabled &&
-      FinampSettingsHelper.finampSettings.autoOfflineListenerActive;
-}
-
-/// Sets the offline mode based on the current connectivity and user settings
-Future<bool> _setOfflineMode(List<ConnectivityResult> connections) async {
-  if (!featureEnabled()) {
-    return FinampSettingsHelper.finampSettings.isOffline;
-  }
-
-  bool state1 = await _shouldBeOffline(connections);
-
-  // this prevents an issue on ios (and mac?) where the
-  // listener gets called even though it shouldn't.
-  // The wait also acts as an timeout so offline mode is less
-  // likely to engage when it doesn't need to and this helps
-  // with queue reloading
-  autoOfflineStatusStream.add(++activeDelayCounter);
-  await Future.delayed(Duration(seconds: 7), () => {});
-  autoOfflineStatusStream.add(--activeDelayCounter);
-
-  // Return Early to prevent another Connectivity check
-  if (!featureEnabled()) {
-    return FinampSettingsHelper.finampSettings.isOffline;
-  }
-  connections = await Connectivity().checkConnectivity();
-  bool state2 = await _shouldBeOffline(connections);
-
-  // skip if state changed during the delay because the function should be triggered by the change again
-  // skip if target state is already the active offline-mode state to prevent unessesary snackbar messages
-  // check if feature is enabled was already done after the delay
-  if (state1 != state2 || FinampSettingsHelper.finampSettings.isOffline == state2) {
-    return FinampSettingsHelper.finampSettings.isOffline;
-  }
-
-  GlobalSnackbar.message(
-    (context) => AppLocalizations.of(context)!.autoOfflineNotification(state2 ? "enabled" : "disabled"),
-  );
-
-  _autoOfflineLogger.info("Automatically ${state2 ? "Enabled" : "Disabled"} Offline Mode");
-
-  FinampSetters.setIsOffline(state2);
-  return state2;
-}
-
-Future<bool> _shouldBeOffline(List<ConnectivityResult> connections) async {
-  switch (FinampSettingsHelper.finampSettings.autoOffline) {
-    case AutoOfflineOption.disconnected:
-      return !connections.contains(ConnectivityResult.mobile) &&
-          !connections.contains(ConnectivityResult.ethernet) &&
-          !connections.contains(ConnectivityResult.wifi);
-    case AutoOfflineOption.network:
-      return !connections.contains(ConnectivityResult.ethernet) && !connections.contains(ConnectivityResult.wifi);
-    case AutoOfflineOption.unreachable:
-      final api = GetIt.instance<JellyfinApiHelper>();
-      if (await api.pingActiveServer()) return false;
-
-      // A missed or stale Android connectivity callback must not strand the
-      // user on a dead LAN address. When the local endpoint has failed but the
-      // configured public endpoint is alive, fail over before enabling offline
-      // mode. This also stops PlayOn and playback-history retries from keeping
-      // the unreachable local URL.
-      final user = GetIt.instance<FinampUserHelper>().currentUser;
-      if ((user?.isLocal ?? false) && await api.pingPublicServer()) {
-        _networkAutomationLogger.warning("Local server is unreachable; failing over to the public address");
-        final sourceChanged = await changeTargetUrl(isLocal: false);
-        if (sourceChanged) {
-          await api.resetNetworkConnections();
-          await DataSourceService.setNetworkAvailable(true, sourceChanged: true);
-          await _reconnectPlayOnService(connections);
+    if (state != FinampConnectivityState.localNetwork) {
+      final activeDownloads = _getDownloads();
+      if (activeDownloads > 0) {
+        if (state == FinampConnectivityState.none) {
+          GlobalSnackbar.message((context) => AppLocalizations.of(context)!.downloadPaused);
+        } else if ((Platform.isAndroid || Platform.isIOS) &&
+            FinampSettingsHelper.finampSettings.requireWifiForDownloads) {
+          GlobalSnackbar.message((context) => AppLocalizations.of(context)!.downloadPaused);
         }
-        return false;
       }
+    }
 
-      return true;
-    default:
-      return false;
-  }
-}
-
-Future<bool> changeTargetUrl({bool? isLocal}) async {
-  FinampUser? user = GetIt.instance<FinampUserHelper>().currentUser;
-  if (user == null) return false;
-
-  if (isLocal != null && isLocal != user.isLocal) {
-    _networKSwitcherLogger.info("Changed active network to ${isLocal ? "local" : "public"} address");
-    GetIt.instance<FinampUserHelper>().currentUser?.update(newIsLocal: isLocal);
-    return true;
-  }
-
-  // this avoids an infinite loop... again :)
-  if (isLocal != null) {
-    return false;
-  }
-
-  // Disable this feature
-  if (!user.preferLocalNetwork) return changeTargetUrl(isLocal: false);
-
-  bool reachable = await GetIt.instance<JellyfinApiHelper>().pingLocalServer();
-  return await changeTargetUrl(isLocal: reachable);
+    // Reconnect after every usable transport transition, including a return
+    // from mobile data to Wi-Fi where the selected URL may not change.
+    if (state != FinampConnectivityState.none) {
+      _schedulePlayOnReconnect();
+    }
+  }, fireImmediately: true);
 }
 
 int _getDownloads() {
   final downloadsService = GetIt.instance<DownloadsService>();
   downloadsService.updateDownloadCounts();
-
-  final nodesSyncing = downloadsService.downloadCounts["sync"]!;
-  final downloadingEnqueued = downloadsService.downloadStatuses[DownloadItemState.enqueued]!;
-  final downloadingRunning = downloadsService.downloadStatuses[DownloadItemState.downloading]!;
-
-  final activeDownloads = nodesSyncing + downloadingEnqueued + downloadingRunning;
-  return activeDownloads;
+  return downloadsService.downloadCounts['sync']! +
+      downloadsService.downloadStatuses[DownloadItemState.enqueued]! +
+      downloadsService.downloadStatuses[DownloadItemState.downloading]!;
 }
 
-void _notifyOfPausedDownloads(List<ConnectivityResult> connections) async {
-  if (!FinampSettingsHelper.finampSettings.isOffline) return;
-
-  if (connections.contains(ConnectivityResult.none)) {
-    if (_getDownloads() == 0) return;
-    GlobalSnackbar.message((context) => AppLocalizations.of(context)!.downloadPaused);
-    return;
-  }
-
-  // desktop doesn't have this setting
-  if (!(Platform.isAndroid || Platform.isIOS)) return;
-
-  if (FinampSettingsHelper.finampSettings.requireWifiForDownloads) {
-    final connectedToWifi = connections.contains(ConnectivityResult.wifi);
-    if (connectedToWifi) return;
-
-    if (_getDownloads() == 0) return;
-
-    GlobalSnackbar.message((context) => AppLocalizations.of(context)!.downloadPaused);
-  }
-}
-
-Future<void> _reconnectPlayOnService(List<ConnectivityResult> connections) async {
+Future<void> _reconnectPlayOnService() async {
   final playOnService = GetIt.instance<PlayOnService>();
-
-  if (connections.contains(ConnectivityResult.none)) {
+  if (_latestConnectivity.contains(ConnectivityResult.none)) {
     playOnService.closeListener();
     return;
   }
   await playOnService.reconnectAfterNetworkChange();
+}
+
+void _schedulePlayOnReconnect() {
+  _playOnReconnectRetry?.cancel();
+  _playOnReconnectRetry = Timer(Duration.zero, () {
+    _playOnReconnectRetry = null;
+    unawaited(_reconnectPlayOnService());
+  });
+}
+
+@riverpod
+Future<FinampConnectivityState> networkConnectivity(Ref ref) async {
+  // Avoid toggling offline mode for the brief transport gap that some
+  // platforms report while handing Wi-Fi over to mobile data.
+  await Future<void>.delayed(const Duration(seconds: 7));
+  final results = _latestConnectivity;
+  if (results.contains(ConnectivityResult.ethernet) || results.contains(ConnectivityResult.wifi)) {
+    return FinampConnectivityState.localNetwork;
+  }
+  if (results.contains(ConnectivityResult.none)) return FinampConnectivityState.none;
+  return FinampConnectivityState.cellular;
+}
+
+@riverpod
+Future<bool> serverReachability(Ref ref, ServerPingType target) {
+  final api = GetIt.instance<JellyfinApiHelper>();
+  switch (target) {
+    case ServerPingType.local:
+      // Never probe a private address after Android has reported that the
+      // local transport is gone: select the public endpoint immediately.
+      final localTransport =
+          _latestConnectivity.contains(ConnectivityResult.ethernet) ||
+          _latestConnectivity.contains(ConnectivityResult.wifi);
+      return localTransport ? api.pingLocalServer() : Future.value(false);
+    case ServerPingType.remote:
+      return api.pingPublicServer();
+    case ServerPingType.active:
+      return api.pingActiveServer();
+  }
+}
+
+@riverpod
+bool? setOfflineMode(Ref ref) {
+  if (!ref.watch(finampSettingsProvider.autoOfflineListenerActive)) return null;
+
+  switch (ref.watch(finampSettingsProvider.autoOffline)) {
+    case AutoOfflineOption.disconnected:
+      final state = ref.watch(networkConnectivityProvider).value;
+      return state == null ? null : state == FinampConnectivityState.none;
+    case AutoOfflineOption.network:
+      final state = ref.watch(networkConnectivityProvider).value;
+      return state == null ? null : state != FinampConnectivityState.localNetwork;
+    case AutoOfflineOption.unreachable:
+      final reachable = ref.watch(serverReachabilityProvider(ServerPingType.active)).value;
+      return reachable == null ? null : !reachable;
+    case AutoOfflineOption.disabled:
+      return null;
+  }
+}
+
+@riverpod
+bool? setLocalUrl(Ref ref) {
+  final user = ref.watch(FinampUserHelper.finampCurrentUserProvider);
+  if (user == null) return null;
+  if (!user.preferLocalNetwork) return false;
+  // Android can report a momentary `none` while it moves to mobile data. Do
+  // not trigger a queue reload on a route that cannot work yet; the following
+  // usable transport event selects the public or local endpoint.
+  if (_latestConnectivity.contains(ConnectivityResult.none)) return null;
+  return ref.watch(serverReachabilityProvider(ServerPingType.local)).value;
+}
+
+Future<void> _onConnectivityChange(List<ConnectivityResult> connections) async {
+  _networkAutomationLogger.info('Network change: ${connections.join(', ')}');
+  _latestConnectivity = connections;
+
+  // Drop stale pooled sockets straight away. The background worker handles
+  // this as a normal task, so a reset can run while an older request unwinds.
+  unawaited(GetIt.instance<JellyfinApiHelper>().resetNetworkConnections());
+
+  final container = GetIt.instance<ProviderContainer>();
+  // Invalidate the active family instance explicitly. Invalidating only the
+  // family root does not reliably refresh an already-listened-to argument.
+  container.invalidate(serverReachabilityProvider(ServerPingType.local));
+  container.invalidate(setLocalUrlProvider);
+  container.invalidate(networkConnectivityProvider);
+
+  _localReachabilityRetry?.cancel();
+  final hasLocalTransport =
+      connections.contains(ConnectivityResult.ethernet) || connections.contains(ConnectivityResult.wifi);
+  if (hasLocalTransport) {
+    _localReachabilityRetry = Timer(_localReachabilityRetryDelay, () {
+      _networkAutomationLogger.fine('Retrying local-server reachability after network hand-off');
+      container.invalidate(serverReachabilityProvider(ServerPingType.local));
+    });
+  }
+
+  if (connections.contains(ConnectivityResult.none)) {
+    _playOnReconnectRetry?.cancel();
+    GetIt.instance<PlayOnService>().closeListener();
+  }
 }

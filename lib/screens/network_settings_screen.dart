@@ -9,8 +9,6 @@ import 'package:finamp/components/global_snackbar.dart';
 import 'package:finamp/l10n/app_localizations.dart';
 import 'package:finamp/services/jellyfin_api_helper.dart';
 import 'package:finamp/services/finamp_settings_helper.dart';
-import 'package:finamp/services/finamp_user_helper.dart';
-import 'package:finamp/services/network_manager.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_tabler_icons/flutter_tabler_icons.dart';
 import 'package:get_it/get_it.dart';
@@ -58,19 +56,12 @@ class _NetworkSettingsScreenState extends State<NetworkSettingsScreen> {
                   // Ensure any pending edits in the local network address field are committed first
                   final widgetState = localNetworkAddressKey.currentState;
                   if (widgetState != null) {
-                    await widgetState.commitIfChanged();
+                    widgetState.commitIfChanged();
                   }
                   final [public, private] = await Future.wait([
                     GetIt.instance<JellyfinApiHelper>().pingPublicServer(),
                     GetIt.instance<JellyfinApiHelper>().pingLocalServer(),
                   ]);
-                  // Testing the connections is also an explicit request to
-                  // re-evaluate the active source.  This provides a reliable
-                  // manual recovery path if Android delivered a network event
-                  // while the app was suspended.
-                  final preferLocalNetwork =
-                      GetIt.instance<FinampUserHelper>().currentUser?.preferLocalNetwork ?? false;
-                  await changeTargetUrl(isLocal: preferLocalNetwork && private);
                   GlobalSnackbar.message(
                     (context) => AppLocalizations.of(context)!.ping("${public.toString()}_${private.toString()}"),
                   );
