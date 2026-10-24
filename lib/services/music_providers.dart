@@ -125,6 +125,9 @@ Future<FinampDisplayable<FinampPlayable>> resolveSection(Ref ref, HomeScreenSect
         return UnavailableHomeSectionPlayable(source: source, section: section);
       }
 
+      if (collectionSection.contentType == ContentType.folders) {
+        return Folder(item, sortConfig: resolvedSort);
+      }
       if (BaseItemDtoType.fromItem(item) == BaseItemDtoType.artist) {
         return Artist(
           item,
