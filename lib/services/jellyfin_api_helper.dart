@@ -133,6 +133,9 @@ class JellyfinApiHelper {
     GetIt.instance.registerSingleton(FinampUserHelper(deviceId: input.$4));
     await GetIt.instance<FinampUserHelper>().setAuthHeader();
     final backgroundApi = jellyfin_api.JellyfinApi.create(inForeground: false, verboseLogging: input.$6);
+    // Do not use `await for` here. A network reset is itself sent through this
+    // port and must replace the HTTP transport while an older request on the
+    // disconnected route is still unwinding.
     requestPort.listen((request) {
       var (func, outputPort) = request as (Future<dynamic> Function(jellyfin_api.JellyfinApi), SendPort);
       Future.sync(() => func(backgroundApi)).then(outputPort.send).catchError((Object error, StackTrace stack) {
@@ -1167,8 +1170,14 @@ class JellyfinApiHelper {
       // because then its not a jellyfin server
       return body.containsKey("IsInNetwork");
     } catch (e) {
-      Logger("Ayoo").severe(e);
+      _jellyfinApiHelperLogger.severe('Server reachability check failed', e);
       return false;
+    } finally {
+      // This short-lived client is not part of JellyfinApiHelper's managed
+      // pool. Chopper does not close a custom IOClient, so release both
+      // layers after every probe.
+      client.dispose();
+      client.httpClient.close();
     }
   }
 

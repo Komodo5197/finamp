@@ -25,10 +25,7 @@ enum FinampConnectivityState { localNetwork, cellular, none }
 enum ServerPingType { local, remote, active }
 
 late List<ConnectivityResult> _latestConnectivity;
-Timer? _localReachabilityRetry;
 Timer? _playOnReconnectRetry;
-
-const _localReachabilityRetryDelay = Duration(seconds: 3);
 
 Future<void> startNetworkAutomation() async {
   final container = GetIt.instance<ProviderContainer>();
@@ -106,7 +103,9 @@ void _schedulePlayOnReconnect() {
 @riverpod
 Future<FinampConnectivityState> networkConnectivity(Ref ref) async {
   // Avoid toggling offline mode for the brief transport gap that some
-  // platforms report while handing Wi-Fi over to mobile data.
+  // platforms report while handing Wi-Fi over to mobile data. Every network
+  // callback invalidates this provider: Riverpod discards an older delayed
+  // build, so only the latest rebuild may publish a connectivity state.
   await Future<void>.delayed(const Duration(seconds: 7));
   final results = _latestConnectivity;
   if (results.contains(ConnectivityResult.ethernet) || results.contains(ConnectivityResult.wifi)) {
@@ -117,16 +116,22 @@ Future<FinampConnectivityState> networkConnectivity(Ref ref) async {
 }
 
 @riverpod
-Future<bool> serverReachability(Ref ref, ServerPingType target) {
+Future<bool?> serverReachability(Ref ref, ServerPingType target) async {
+  // Let the connectivity provider settle before probing either address. This
+  // replaces the separate local-address retry and gives every ping variant the
+  // same hand-off semantics.
+  final connectivity = ref.watch(networkConnectivityProvider);
+  if (connectivity.isLoading || connectivity.value == null) return null;
+
+  final state = connectivity.requireValue;
+  if (state == FinampConnectivityState.none) return false;
+
   final api = GetIt.instance<JellyfinApiHelper>();
   switch (target) {
     case ServerPingType.local:
       // Never probe a private address after Android has reported that the
       // local transport is gone: select the public endpoint immediately.
-      final localTransport =
-          _latestConnectivity.contains(ConnectivityResult.ethernet) ||
-          _latestConnectivity.contains(ConnectivityResult.wifi);
-      return localTransport ? api.pingLocalServer() : Future.value(false);
+      return state == FinampConnectivityState.localNetwork ? api.pingLocalServer() : false;
     case ServerPingType.remote:
       return api.pingPublicServer();
     case ServerPingType.active:
@@ -158,10 +163,6 @@ bool? setLocalUrl(Ref ref) {
   final user = ref.watch(FinampUserHelper.finampCurrentUserProvider);
   if (user == null) return null;
   if (!user.preferLocalNetwork) return false;
-  // Android can report a momentary `none` while it moves to mobile data. Do
-  // not trigger a queue reload on a route that cannot work yet; the following
-  // usable transport event selects the public or local endpoint.
-  if (_latestConnectivity.contains(ConnectivityResult.none)) return null;
   return ref.watch(serverReachabilityProvider(ServerPingType.local)).value;
 }
 
@@ -174,21 +175,14 @@ Future<void> _onConnectivityChange(List<ConnectivityResult> connections) async {
   unawaited(GetIt.instance<JellyfinApiHelper>().resetNetworkConnections());
 
   final container = GetIt.instance<ProviderContainer>();
-  // Invalidate the active family instance explicitly. Invalidating only the
-  // family root does not reliably refresh an already-listened-to argument.
-  container.invalidate(serverReachabilityProvider(ServerPingType.local));
-  container.invalidate(setLocalUrlProvider);
   container.invalidate(networkConnectivityProvider);
-
-  _localReachabilityRetry?.cancel();
-  final hasLocalTransport =
-      connections.contains(ConnectivityResult.ethernet) || connections.contains(ConnectivityResult.wifi);
-  if (hasLocalTransport) {
-    _localReachabilityRetry = Timer(_localReachabilityRetryDelay, () {
-      _networkAutomationLogger.fine('Retrying local-server reachability after network hand-off');
-      container.invalidate(serverReachabilityProvider(ServerPingType.local));
-    });
+  // Each family argument is its own provider instance. Refresh every route:
+  // local selection, public fail-over and the active-url offline check.
+  for (final target in ServerPingType.values) {
+    container.invalidate(serverReachabilityProvider(target));
   }
+  // setLocalUrlProvider watches the local reachability provider and therefore
+  // invalidates itself when that dependency rebuilds.
 
   if (connections.contains(ConnectivityResult.none)) {
     _playOnReconnectRetry?.cancel();
