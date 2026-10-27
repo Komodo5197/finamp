@@ -135,7 +135,13 @@ Future<bool?> serverReachability(Ref ref, ServerPingType target) async {
     case ServerPingType.remote:
       return api.pingPublicServer();
     case ServerPingType.active:
-      return api.pingActiveServer();
+      // Do not ping the URL that was active before a hand-off: it can still
+      // point at the just-lost local route, which would turn auto-offline on
+      // before the public fallback is selected. Wait for route selection and
+      // reuse the reachability result for that selected endpoint instead.
+      final useLocalUrl = ref.watch(setLocalUrlProvider);
+      if (useLocalUrl == null) return null;
+      return ref.watch(serverReachabilityProvider(useLocalUrl ? ServerPingType.local : ServerPingType.remote)).value;
   }
 }
 
