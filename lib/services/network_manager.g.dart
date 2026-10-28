@@ -32,7 +32,7 @@ final networkConnectivityProvider =
 typedef NetworkConnectivityRef =
     AutoDisposeFutureProviderRef<FinampConnectivityState>;
 String _$serverReachabilityHash() =>
-    r'32148dfeb94c9445610b52220fd9ac3908946b1b';
+    r'9b8bc559910358843facffa0f3755cdbff2b3350';
 
 /// Copied from Dart SDK
 class _SystemHash {
