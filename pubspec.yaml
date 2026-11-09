@@ -204,6 +204,7 @@ dev_dependencies:
       ref: f070a067378c215b9212a2a22ea593293671c9c9
       path: packages/isar_generator
   msix: ^3.16.9
+  xml: ^6.0.0
 
 dependency_overrides:
   # force isar_generator community fork to accept baseline isar.
